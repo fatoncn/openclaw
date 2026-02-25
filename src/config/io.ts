@@ -426,6 +426,10 @@ function stampConfigVersion(cfg: OpenClawConfig): OpenClawConfig {
 }
 
 function warnIfConfigFromFuture(cfg: OpenClawConfig, logger: Pick<typeof console, "warn">): void {
+  // Kosbling Edition: suppress version mismatch warning
+  if (VERSION.includes("kosbling")) {
+    return;
+  }
   const touched = cfg.meta?.lastTouchedVersion;
   if (!touched) {
     return;

@@ -115,6 +115,10 @@ export async function runGatewayUpdateCheck(params: {
   if (params.isNixMode) {
     return;
   }
+  // Kosbling Edition: skip update hints
+  if (VERSION.includes("kosbling")) {
+    return;
+  }
   if (params.cfg.update?.checkOnStart === false) {
     return;
   }

@@ -41,6 +41,7 @@ import { defaultRuntime } from "../../runtime.js";
 import { stylePromptMessage } from "../../terminal/prompt-style.js";
 import { theme } from "../../terminal/theme.js";
 import { pathExists, sleep } from "../../utils.js";
+import { VERSION } from "../../version.js";
 import { replaceCliName, resolveCliName } from "../cli-name.js";
 import { formatCliCommand } from "../command-format.js";
 import { installCompletion } from "../completion-cli.js";
@@ -695,6 +696,12 @@ async function maybeRestartService(params: {
 
 export async function updateCommand(opts: UpdateCommandOptions): Promise<void> {
   suppressDeprecations();
+
+  // Kosbling Edition: update command disabled
+  if (VERSION.includes("kosbling")) {
+    defaultRuntime.log("Kosbling Edition: please use `git pull && ./build-and-link.sh` to update.");
+    return;
+  }
 
   const timeoutMs = parseTimeoutMsOrExit(opts.timeout);
   const shouldRestart = opts.restart !== false;

@@ -97,6 +97,20 @@ export type OpenClawConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
+  // KOSBLING-PATCH: model isolation
+  kosbling?: {
+    modelIsolation?: {
+      enabled?: boolean;
+      main?: {
+        model?: string;
+        fallbacks?: string[];
+      };
+      secondary?: {
+        model?: string;
+        fallbacks?: string[];
+      };
+    };
+  };
 };
 
 export type ConfigValidationIssue = {
