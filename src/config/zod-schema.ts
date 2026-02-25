@@ -576,6 +576,32 @@ export const OpenClawSchema = z
       .strict()
       .optional(),
     memory: MemorySchema,
+    // KOSBLING-PATCH: model isolation
+    kosbling: z
+      .object({
+        modelIsolation: z
+          .object({
+            enabled: z.boolean().optional(),
+            main: z
+              .object({
+                model: z.string().optional(),
+                fallbacks: z.array(z.string()).optional(),
+              })
+              .strict()
+              .optional(),
+            secondary: z
+              .object({
+                model: z.string().optional(),
+                fallbacks: z.array(z.string()).optional(),
+              })
+              .strict()
+              .optional(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
     skills: z
       .object({
         allowBundled: z.array(z.string()).optional(),
