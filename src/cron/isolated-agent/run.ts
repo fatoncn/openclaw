@@ -448,16 +448,16 @@ export async function runCronIsolatedAgentTurn(params: {
       verboseLevel: resolvedVerboseLevel,
     });
     const messageChannel = resolvedDelivery.channel;
-    // KOSBLING-PATCH: model isolation
+    // KOSBLING-PATCH: model isolation — if kosblingParams present, always use it, never fall back to payload/session provider
     const kosblingParams = resolveKosblingIsolationParams(params.cfg, agentSessionKey);
     const fallbackResult = await runWithModelFallback({
       cfg: cfgWithAgentDefaults,
-      provider: kosblingParams?.provider ?? provider,
-      model: kosblingParams?.model ?? model,
+      provider: kosblingParams ? kosblingParams.provider : provider,
+      model: kosblingParams ? kosblingParams.model : model,
       agentDir,
-      fallbacksOverride:
-        kosblingParams?.fallbacksOverride ??
-        resolveAgentModelFallbacksOverride(params.cfg, agentId),
+      fallbacksOverride: kosblingParams
+        ? kosblingParams.fallbacksOverride
+        : resolveAgentModelFallbacksOverride(params.cfg, agentId),
       run: (providerOverride, modelOverride) => {
         if (isCliProvider(providerOverride, cfgWithAgentDefaults)) {
           const cliSessionId = getCliSessionId(cronSession.sessionEntry, providerOverride);

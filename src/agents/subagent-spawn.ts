@@ -261,12 +261,12 @@ export async function spawnSubagentDirect(
   const childDepth = callerDepth + 1;
   const spawnedByKey = requesterInternalKey;
   const targetAgentConfig = resolveAgentConfig(cfg, targetAgentId);
-  // KOSBLING-PATCH: use secondary model for subagents unless caller explicitly overrides
+  // KOSBLING-PATCH: if isolation enabled, always use secondary model, ignore modelOverride
   const kosblingSecondaryModel = resolveKosblingSubagentModel(cfg);
   const resolvedModel = resolveSubagentSpawnModelSelection({
     cfg,
     agentId: targetAgentId,
-    modelOverride: modelOverride ?? kosblingSecondaryModel,
+    modelOverride: kosblingSecondaryModel ?? modelOverride,
   });
 
   const resolvedThinkingDefaultRaw =
