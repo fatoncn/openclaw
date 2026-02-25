@@ -1,4 +1,5 @@
 import { resolveAgentModelFallbacksOverride } from "../../agents/agent-scope.js";
+import { resolveKosblingIsolationParams } from "../../agents/kosbling-isolation.js"; // KOSBLING-PATCH
 import type { NormalizedUsage } from "../../agents/usage.js";
 import { getChannelDock } from "../../channels/dock.js";
 import type { ChannelId, ChannelThreadingToolContext } from "../../channels/plugins/types.js";
@@ -138,6 +139,17 @@ export const resolveEnforceFinalTag = (run: FollowupRun["run"], provider: string
   Boolean(run.enforceFinalTag || isReasoningTagProvider(provider));
 
 export function resolveModelFallbackOptions(run: FollowupRun["run"]) {
+  // KOSBLING-PATCH: model isolation
+  const kosblingParams = resolveKosblingIsolationParams(run.config, run.sessionKey);
+  if (kosblingParams) {
+    return {
+      cfg: run.config,
+      provider: kosblingParams.provider,
+      model: kosblingParams.model,
+      agentDir: run.agentDir,
+      fallbacksOverride: kosblingParams.fallbacksOverride,
+    };
+  }
   return {
     cfg: run.config,
     provider: run.provider,

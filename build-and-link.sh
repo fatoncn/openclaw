@@ -15,11 +15,23 @@ set -e
 
 cd "$(dirname "$0")"
 
+# 从 git tag 注入版本号到 package.json
+GIT_VERSION=$(git describe --tags --match 'v*-kosbling.*' 2>/dev/null | sed 's/^v//')
+if [ -z "$GIT_VERSION" ]; then
+  # 没有 kosbling tag，用最近的任意 tag
+  GIT_VERSION=$(git describe --tags 2>/dev/null | sed 's/^v//')
+fi
+if [ -n "$GIT_VERSION" ]; then
+  echo "📌 Version from git: $GIT_VERSION"
+  node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.version='$GIT_VERSION'; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+fi
+
 echo "📦 Installing dependencies..."
 pnpm install --frozen-lockfile 2>/dev/null || pnpm install
 
 echo "🔨 Building..."
 pnpm build
+pnpm ui:build
 
 # 卸载官方 openclaw（如果存在且不是当前目录的 link）
 CURRENT_LINK=$(npm ls -g openclaw --parseable 2>/dev/null || true)

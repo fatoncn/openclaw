@@ -10,6 +10,7 @@ import { getCliSessionId, setCliSessionId } from "../../agents/cli-session.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { resolveCronStyleNow } from "../../agents/current-time.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
+import { resolveKosblingIsolationParams } from "../../agents/kosbling-isolation.js"; // KOSBLING-PATCH
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import {
@@ -447,12 +448,16 @@ export async function runCronIsolatedAgentTurn(params: {
       verboseLevel: resolvedVerboseLevel,
     });
     const messageChannel = resolvedDelivery.channel;
+    // KOSBLING-PATCH: model isolation
+    const kosblingParams = resolveKosblingIsolationParams(params.cfg, agentSessionKey);
     const fallbackResult = await runWithModelFallback({
       cfg: cfgWithAgentDefaults,
-      provider,
-      model,
+      provider: kosblingParams?.provider ?? provider,
+      model: kosblingParams?.model ?? model,
       agentDir,
-      fallbacksOverride: resolveAgentModelFallbacksOverride(params.cfg, agentId),
+      fallbacksOverride:
+        kosblingParams?.fallbacksOverride ??
+        resolveAgentModelFallbacksOverride(params.cfg, agentId),
       run: (providerOverride, modelOverride) => {
         if (isCliProvider(providerOverride, cfgWithAgentDefaults)) {
           const cliSessionId = getCliSessionId(cronSession.sessionEntry, providerOverride);
