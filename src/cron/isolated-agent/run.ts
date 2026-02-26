@@ -248,16 +248,17 @@ export async function runCronIsolatedAgentTurn(params: {
   }
   const modelOverrideRaw =
     params.job.payload.kind === "agentTurn" ? params.job.payload.model : undefined;
-  const modelOverride = typeof modelOverrideRaw === "string" ? modelOverrideRaw.trim() : undefined;
-  // KOSBLING-PATCH: warn when cron payload specifies a model but isolation is enabled
+  let modelOverride = typeof modelOverrideRaw === "string" ? modelOverrideRaw.trim() : undefined;
+  // KOSBLING-PATCH: when edition isolation is active, ignore cron payload model override
   if (
     modelOverride !== undefined &&
     modelOverride.length > 0 &&
     resolveEditionIsolationParams(params.cfg, agentSessionKey, agentId) // KOSBLING-PATCH
   ) {
     logWarn(
-      `[cron:${params.job.id}] Cron model override ignored: Kosbling model isolation policy enforces secondary model group.`,
+      `[cron:${params.job.id}] Cron model override "${modelOverride}" ignored: edition model isolation enforces secondary model group.`,
     );
+    modelOverride = undefined; // KOSBLING-PATCH: actually ignore the override
   }
   if (modelOverride !== undefined && modelOverride.length > 0) {
     const resolvedOverride = resolveAllowedModelRef({
