@@ -109,6 +109,13 @@ export type OpenClawConfig = {
         model?: string;
         fallbacks?: string[];
       };
+      agents?: Record<
+        string,
+        {
+          // KOSBLING-PATCH
+          model?: string;
+        }
+      >;
     };
   };
 };

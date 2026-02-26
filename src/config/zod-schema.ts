@@ -596,6 +596,16 @@ export const OpenClawSchema = z
               })
               .strict()
               .optional(),
+            agents: z // KOSBLING-PATCH
+              .record(
+                z.string(),
+                z
+                  .object({
+                    model: z.string(),
+                  })
+                  .strict(),
+              )
+              .optional(),
           })
           .strict()
           .optional(),

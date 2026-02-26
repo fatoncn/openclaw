@@ -253,7 +253,7 @@ export async function runCronIsolatedAgentTurn(params: {
   if (
     modelOverride !== undefined &&
     modelOverride.length > 0 &&
-    resolveKosblingIsolationParams(params.cfg, agentSessionKey)
+    resolveKosblingIsolationParams(params.cfg, agentSessionKey, agentId) // KOSBLING-PATCH
   ) {
     logWarn(
       `[cron:${params.job.id}] Cron model override ignored: Kosbling model isolation policy enforces secondary model group.`,
@@ -459,7 +459,7 @@ export async function runCronIsolatedAgentTurn(params: {
     });
     const messageChannel = resolvedDelivery.channel;
     // KOSBLING-PATCH: model isolation — if kosblingParams present, always use it, never fall back to payload/session provider
-    const kosblingParams = resolveKosblingIsolationParams(params.cfg, agentSessionKey);
+    const kosblingParams = resolveKosblingIsolationParams(params.cfg, agentSessionKey, agentId); // KOSBLING-PATCH
     const fallbackResult = await runWithModelFallback({
       cfg: cfgWithAgentDefaults,
       provider: kosblingParams ? kosblingParams.provider : provider,

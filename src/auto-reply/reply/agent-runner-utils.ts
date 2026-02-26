@@ -140,7 +140,8 @@ export const resolveEnforceFinalTag = (run: FollowupRun["run"], provider: string
 
 export function resolveModelFallbackOptions(run: FollowupRun["run"]) {
   // KOSBLING-PATCH: model isolation
-  const kosblingParams = resolveKosblingIsolationParams(run.config, run.sessionKey);
+  const agentId = resolveAgentIdFromSessionKey(run.sessionKey); // KOSBLING-PATCH
+  const kosblingParams = resolveKosblingIsolationParams(run.config, run.sessionKey, agentId);
   if (kosblingParams) {
     return {
       cfg: run.config,

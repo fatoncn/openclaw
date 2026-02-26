@@ -18,6 +18,7 @@ export type KosblingIsolationParams = {
 export function resolveKosblingIsolationParams(
   cfg: OpenClawConfig,
   sessionKey: string | undefined | null,
+  agentId?: string, // KOSBLING-PATCH
 ): KosblingIsolationParams {
   const isolation = cfg.kosbling?.modelIsolation;
   if (!isolation?.enabled) {
@@ -41,9 +42,47 @@ export function resolveKosblingIsolationParams(
     return null;
   }
 
+  // Per-agent model override (must be within group allowlist) // KOSBLING-PATCH
+  let finalProvider = resolved.ref.provider;
+  let finalModel = resolved.ref.model;
+
+  if (agentId && isolation.agents?.[agentId]?.model) {
+    const agentModelRaw = isolation.agents[agentId].model;
+    const agentResolved = resolveModelRefFromString({
+      raw: agentModelRaw,
+      defaultProvider: DEFAULT_PROVIDER,
+      aliasIndex,
+    });
+
+    if (agentResolved) {
+      // Build allowlist from group: [primary model, ...fallbacks]
+      const groupAllowlist: string[] = [];
+      // Add primary
+      groupAllowlist.push(`${resolved.ref.provider}/${resolved.ref.model}`);
+      // Add fallbacks (resolve each through alias)
+      for (const fb of groupCfg.fallbacks ?? []) {
+        const fbResolved = resolveModelRefFromString({
+          raw: fb,
+          defaultProvider: DEFAULT_PROVIDER,
+          aliasIndex,
+        });
+        if (fbResolved) {
+          groupAllowlist.push(`${fbResolved.ref.provider}/${fbResolved.ref.model}`);
+        }
+      }
+
+      const agentModelFull = `${agentResolved.ref.provider}/${agentResolved.ref.model}`;
+      if (groupAllowlist.includes(agentModelFull)) {
+        finalProvider = agentResolved.ref.provider;
+        finalModel = agentResolved.ref.model;
+      }
+      // If not in allowlist, silently ignore and use group default
+    }
+  }
+
   return {
-    provider: resolved.ref.provider,
-    model: resolved.ref.model,
+    provider: finalProvider,
+    model: finalModel,
     fallbacksOverride: groupCfg.fallbacks ?? [],
   };
 }
