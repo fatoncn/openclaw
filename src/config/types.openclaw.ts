@@ -98,7 +98,7 @@ export type OpenClawConfig = {
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
   // KOSBLING-PATCH: model isolation
-  kosbling?: {
+  edition?: {
     modelIsolation?: {
       enabled?: boolean;
       main?: {
@@ -109,6 +109,13 @@ export type OpenClawConfig = {
         model?: string;
         fallbacks?: string[];
       };
+      agents?: Record<
+        string,
+        {
+          // KOSBLING-PATCH
+          model?: string;
+        }
+      >;
     };
   };
 };
