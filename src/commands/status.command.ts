@@ -164,6 +164,7 @@ export async function statusCommand(
           nodeService: nodeDaemon,
           agents: agentStatus,
           securityAudit,
+          modelIsolation: cfg.kosbling?.modelIsolation ?? null, // KOSBLING-PATCH
           ...(health || usage || lastHeartbeat ? { health, usage, lastHeartbeat } : {}),
         },
         null,
@@ -352,6 +353,27 @@ export async function statusCommand(
   const channelLabel = channelInfo.label;
   const gitLabel = formatGitInstallLabel(update);
 
+  // KOSBLING-PATCH: model isolation display
+  const modelIsolationValue = (() => {
+    const isolation = cfg.kosbling?.modelIsolation;
+    if (!isolation?.enabled) {
+      return "🔓 disabled";
+    }
+    const fmtGroup = (g?: { model?: string; fallbacks?: string[] }) => {
+      if (!g?.model) {
+        return "not configured";
+      }
+      const fb = g.fallbacks?.length ? ` → [${g.fallbacks.join(", ")}]` : "";
+      return `${g.model}${fb}`;
+    };
+    const perAgentEntries = isolation.agents ? Object.entries(isolation.agents) : [];
+    const perAgent =
+      perAgentEntries.length > 0
+        ? perAgentEntries.map(([k, v]) => `${k}=${v?.model ?? "?"}`).join(", ")
+        : "none";
+    return `🔒 enabled · main: ${fmtGroup(isolation.main)} · secondary: ${fmtGroup(isolation.secondary)} · per-agent: ${perAgent}`;
+  })(); // KOSBLING-PATCH
+
   const overviewRows = [
     { Item: "Dashboard", Value: dashboard },
     { Item: "OS", Value: `${osSummary.label} · node ${process.versions.node}` },
@@ -379,6 +401,7 @@ export async function statusCommand(
     { Item: "Events", Value: eventsValue },
     { Item: "Heartbeat", Value: heartbeatValue },
     ...(lastHeartbeatValue ? [{ Item: "Last heartbeat", Value: lastHeartbeatValue }] : []),
+    { Item: "Model Isolation", Value: modelIsolationValue }, // KOSBLING-PATCH
     {
       Item: "Sessions",
       Value: `${summary.sessions.count} active · default ${defaults.model ?? "unknown"}${defaultCtx} · ${storeLabel}`,
