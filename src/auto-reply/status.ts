@@ -24,7 +24,11 @@ import { formatTimeAgo } from "../infra/format-time/format-relative.ts";
 import { resolveCommitHash } from "../infra/git-commit.js";
 import type { MediaUnderstandingDecision } from "../media-understanding/types.js";
 import { listPluginCommands } from "../plugins/commands.js";
-import { resolveAgentIdFromSessionKey } from "../routing/session-key.js";
+import {
+  resolveAgentIdFromSessionKey,
+  isCronSessionKey,
+  isSubagentSessionKey,
+} from "../routing/session-key.js"; // KOSBLING-PATCH
 import {
   getTtsMaxLength,
   getTtsProvider,
@@ -395,6 +399,74 @@ const formatVoiceModeLine = (
   return `🔊 Voice: ${autoMode} · provider=${provider} · limit=${maxLength} · summary=${summarize}`;
 };
 
+// KOSBLING-PATCH: format edition model isolation line
+const formatEditionIsolationLine = (
+  config?: OpenClawConfig,
+  sessionKey?: string,
+  agentId?: string,
+): string | null => {
+  if (!config) {
+    return null;
+  }
+  const isolation = config.edition?.modelIsolation;
+  if (!isolation?.enabled) {
+    return null;
+  }
+
+  const isSecondary = isCronSessionKey(sessionKey) || isSubagentSessionKey(sessionKey);
+  const groupCfg = isSecondary ? isolation.secondary : isolation.main;
+  const groupName = isSecondary ? "secondary" : "main";
+
+  if (!groupCfg?.model) {
+    return `🔒 Edition: ${groupName} group · not configured`;
+  }
+
+  // Check for per-agent override
+  let effectiveModel = groupCfg.model;
+  if (agentId && isolation.agents?.[agentId]?.model) {
+    const agentModel = isolation.agents[agentId].model;
+    const aliasIndex = buildModelAliasIndex({ cfg: config, defaultProvider: DEFAULT_PROVIDER });
+
+    // Build group allowlist
+    const groupAllowlist: string[] = [groupCfg.model];
+    if (groupCfg.fallbacks) {
+      groupAllowlist.push(...groupCfg.fallbacks);
+    }
+
+    // Resolve agent model
+    const agentResolved = resolveModelRefFromString({
+      raw: agentModel,
+      defaultProvider: DEFAULT_PROVIDER,
+      aliasIndex,
+    });
+
+    if (agentResolved) {
+      const agentModelFull = `${agentResolved.ref.provider}/${agentResolved.ref.model}`;
+      // Check if agent model is in group allowlist (need to resolve each allowlist entry)
+      const resolvedAllowlist = groupAllowlist
+        .map((fb) => {
+          const resolved = resolveModelRefFromString({
+            raw: fb,
+            defaultProvider: DEFAULT_PROVIDER,
+            aliasIndex,
+          });
+          return resolved ? `${resolved.ref.provider}/${resolved.ref.model}` : null;
+        })
+        .filter((x): x is string => x !== null);
+
+      if (resolvedAllowlist.includes(agentModelFull)) {
+        effectiveModel = agentModel;
+      }
+    }
+  }
+
+  const fallbacksLabel = groupCfg.fallbacks?.length
+    ? ` · fallbacks: [${groupCfg.fallbacks.join(", ")}]`
+    : "";
+
+  return `🔒 Edition: ${groupName} group · ${effectiveModel}${fallbacksLabel}`;
+}; // KOSBLING-PATCH
+
 export function buildStatusMessage(args: StatusArgs): string {
   const now = args.now ?? Date.now();
   const entry = args.sessionEntry;
@@ -624,12 +696,14 @@ export function buildStatusMessage(args: StatusArgs): string {
     usagePair && costLine ? `${usagePair} · ${costLine}` : (usagePair ?? costLine);
   const mediaLine = formatMediaUnderstandingLine(args.mediaDecisions);
   const voiceLine = formatVoiceModeLine(args.config, args.sessionEntry);
+  const editionLine = formatEditionIsolationLine(args.config, args.sessionKey, args.agentId); // KOSBLING-PATCH
 
   return [
     versionLine,
     args.timeLine,
     modelLine,
     fallbackLine,
+    editionLine, // KOSBLING-PATCH
     usageCostLine,
     cacheLine,
     `📚 ${contextLine}`,
