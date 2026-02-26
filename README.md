@@ -79,7 +79,7 @@ openclaw.json 配置：
 ### 首次安装（目标机器）
 
 ```bash
-git clone git@github.com:fatoncn/openclaw.git ~/.openclaw-kosbling
+git clone -b kosbling git@github.com:fatoncn/openclaw.git ~/.openclaw-kosbling
 cd ~/.openclaw-kosbling
 ./build-and-link.sh
 ```
