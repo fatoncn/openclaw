@@ -33,18 +33,30 @@ echo "🔨 Building..."
 pnpm build
 pnpm ui:build
 
-# 卸载官方 openclaw（如果存在且不是当前目录的 link）
-CURRENT_LINK=$(npm ls -g openclaw --parseable 2>/dev/null || true)
-if [ -n "$CURRENT_LINK" ] && [ "$(realpath "$CURRENT_LINK" 2>/dev/null)" != "$(realpath "$(pwd)" 2>/dev/null)" ]; then
-  echo "🗑️  Removing existing openclaw global install..."
-  npm uninstall -g openclaw 2>/dev/null || true
+# 只有运行仓库（~/.openclaw-kosbling）才执行 link
+# 开发仓库只 build，不抢全局 CLI
+RUNTIME_REPO="$HOME/.openclaw-kosbling"
+CURRENT_DIR="$(realpath "$(pwd)")"
+
+if [ "$CURRENT_DIR" = "$(realpath "$RUNTIME_REPO" 2>/dev/null)" ]; then
+  # 运行仓库：卸载旧的 + link
+  CURRENT_LINK=$(npm ls -g openclaw --parseable 2>/dev/null || true)
+  if [ -n "$CURRENT_LINK" ] && [ "$(realpath "$CURRENT_LINK" 2>/dev/null)" != "$CURRENT_DIR" ]; then
+    echo "🗑️  Removing existing openclaw global install..."
+    npm uninstall -g openclaw 2>/dev/null || true
+  fi
+
+  echo "🔗 Linking to global CLI..."
+  npm link
+
+  echo ""
+  echo "✅ OpenClaw Kosbling Edition ready!"
+  echo "   Source: $(pwd)"
+  echo "   CLI:    $(which openclaw)"
+  echo "   Version: $(openclaw --version 2>/dev/null || echo 'unknown')"
+else
+  echo ""
+  echo "✅ Build complete (dev repo — no global link)"
+  echo "   Source: $(pwd)"
+  echo "   ℹ️  To deploy, push to git then run build-and-link.sh in $RUNTIME_REPO"
 fi
-
-echo "🔗 Linking to global CLI..."
-npm link
-
-echo ""
-echo "✅ OpenClaw Kosbling Edition ready!"
-echo "   Source: $(pwd)"
-echo "   CLI:    $(which openclaw)"
-echo "   Version: $(openclaw --version 2>/dev/null || echo 'unknown')"
