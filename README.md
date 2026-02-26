@@ -79,7 +79,7 @@ openclaw.json 配置：
 ### 首次安装（目标机器）
 
 ```bash
-git clone -b kosbling git@github.com:fatoncn/openclaw.git ~/.openclaw-kosbling
+git clone git@github.com:fatoncn/openclaw.git ~/.openclaw-kosbling
 cd ~/.openclaw-kosbling
 ./build-and-link.sh
 ```
@@ -101,7 +101,7 @@ git pull
 ```bash
 ./build-and-link.sh          # 仅构建，验证编译通过
 git add -A && git commit     # 提交
-git push origin kosbling     # 推送
+git push origin main     # 推送
 ```
 
 然后在运行仓库（`~/.openclaw-kosbling`）pull + build 部署。
@@ -122,22 +122,24 @@ echo "2026.2.21-kosbling.3" > VERSION
 
 # 2. 提交推送
 git add -A && git commit -m "release: v2026.2.21-kosbling.3"
-git push origin kosbling
+git push origin main
 ```
 
 ## 同步上游
 
 ```bash
-git fetch upstream
-git merge v2026.2.xx --no-ff -m "Merge upstream v2026.2.xx"
-git push origin main
+git fetch upstream-remote
+git checkout upstream
+git merge v2026.2.xx
+git checkout main
+git merge upstream --no-ff -m "Merge upstream v2026.2.xx"
+git push origin main upstream
 ```
 
 ## 分支说明
 
-- `main` — 主分支，跟踪上游 + Kosbling 定制
-- `kosbling` — 主开发分支
-- `feature/*` — 功能分支，合并后保留备查
+- `main` — 主开发分支，包含所有 Kosbling Edition 定制
+- `upstream` — 跟踪上游 OpenClaw，用于同步合并
 
 ## 许可证
 
