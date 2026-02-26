@@ -133,4 +133,9 @@ export const LEGACY_CONFIG_RULES: LegacyConfigRule[] = [
     path: ["gateway", "token"],
     message: "gateway.token is ignored; use gateway.auth.token instead (auto-migrated on load).",
   },
+  // KOSBLING-PATCH
+  {
+    path: ["kosbling"],
+    message: "kosbling config key was renamed to edition (auto-migrated on load).",
+  },
 ];

@@ -5,7 +5,7 @@ import { isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.j
 import { DEFAULT_PROVIDER } from "./defaults.js";
 import { buildModelAliasIndex, resolveModelRefFromString } from "./model-selection.js";
 
-export type KosblingIsolationParams = {
+export type EditionIsolationParams = {
   provider: string;
   model: string;
   /** Empty array = disable fallback, never cross-group */
@@ -13,15 +13,15 @@ export type KosblingIsolationParams = {
 } | null;
 
 /**
- * Returns model isolation params based on sessionKey and kosbling config.
+ * Returns model isolation params based on sessionKey and edition config.
  * Returns null if isolation is disabled or not configured — caller uses original logic.
  */
-export function resolveKosblingIsolationParams(
+export function resolveEditionIsolationParams(
   cfg: OpenClawConfig,
   sessionKey: string | undefined | null,
   agentId?: string, // KOSBLING-PATCH
-): KosblingIsolationParams {
-  const isolation = cfg.kosbling?.modelIsolation;
+): EditionIsolationParams {
+  const isolation = cfg.edition?.modelIsolation;
   if (!isolation?.enabled) {
     return null;
   }
@@ -87,7 +87,7 @@ export function resolveKosblingIsolationParams(
       : "none";
   const groupName = isSecondary ? "secondary" : "main";
   logInfo(
-    `[kosbling-isolation] group=${groupName} model=${finalProvider}/${finalModel} agent=${agentId ?? "unknown"} per-agent=${perAgentInfo}`,
+    `[edition-isolation] group=${groupName} model=${finalProvider}/${finalModel} agent=${agentId ?? "unknown"} per-agent=${perAgentInfo}`,
   ); // KOSBLING-PATCH
 
   return {
@@ -98,11 +98,11 @@ export function resolveKosblingIsolationParams(
 }
 
 /**
- * Returns "provider/model" string for kosbling secondary group, for subagent spawn.
+ * Returns "provider/model" string for edition secondary group, for subagent spawn.
  * Returns undefined if isolation is disabled or not configured.
  */
-export function resolveKosblingSubagentModel(cfg: OpenClawConfig): string | undefined {
-  const isolation = cfg.kosbling?.modelIsolation;
+export function resolveEditionSubagentModel(cfg: OpenClawConfig): string | undefined {
+  const isolation = cfg.edition?.modelIsolation;
   if (!isolation?.enabled) {
     return undefined;
   }
@@ -121,7 +121,7 @@ export function resolveKosblingSubagentModel(cfg: OpenClawConfig): string | unde
     return undefined;
   }
   logInfo(
-    `[kosbling-isolation] subagent-spawn model=${resolved.ref.provider}/${resolved.ref.model}`,
+    `[edition-isolation] subagent-spawn model=${resolved.ref.provider}/${resolved.ref.model}`,
   ); // KOSBLING-PATCH
   return `${resolved.ref.provider}/${resolved.ref.model}`;
 }

@@ -194,6 +194,23 @@ export const LEGACY_CONFIG_MIGRATIONS_PART_3: LegacyConfigMigration[] = [
       changes.push("Moved agent → agents.defaults.");
     },
   },
+  // KOSBLING-PATCH
+  {
+    id: "kosbling->edition",
+    describe: "Rename top-level config key 'kosbling' to 'edition'",
+    apply: (raw, changes) => {
+      if (!("kosbling" in raw)) {
+        return;
+      }
+      if (!("edition" in raw)) {
+        raw.edition = raw.kosbling;
+        changes.push("[edition-migration] Migrated config key kosbling → edition");
+      } else {
+        changes.push("[edition-migration] Removed kosbling key (edition already set)");
+      }
+      delete raw.kosbling;
+    },
+  },
   {
     id: "identity->agents.list",
     describe: "Move identity to agents.list[].identity",

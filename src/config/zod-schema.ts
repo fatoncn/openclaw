@@ -577,7 +577,7 @@ export const OpenClawSchema = z
       .optional(),
     memory: MemorySchema,
     // KOSBLING-PATCH: model isolation
-    kosbling: z
+    edition: z
       .object({
         modelIsolation: z
           .object({

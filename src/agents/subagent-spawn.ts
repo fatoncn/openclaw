@@ -7,7 +7,7 @@ import { getGlobalHookRunner } from "../plugins/hook-runner-global.js";
 import { normalizeAgentId, parseAgentSessionKey } from "../routing/session-key.js";
 import { normalizeDeliveryContext } from "../utils/delivery-context.js";
 import { resolveAgentConfig } from "./agent-scope.js";
-import { resolveKosblingSubagentModel } from "./kosbling-isolation.js"; // KOSBLING-PATCH
+import { resolveEditionSubagentModel } from "./edition-isolation.js"; // KOSBLING-PATCH
 import { AGENT_LANE_SUBAGENT } from "./lanes.js";
 import { resolveSubagentSpawnModelSelection } from "./model-selection.js";
 import { buildSubagentSystemPrompt } from "./subagent-announce.js";
@@ -262,7 +262,7 @@ export async function spawnSubagentDirect(
   const spawnedByKey = requesterInternalKey;
   const targetAgentConfig = resolveAgentConfig(cfg, targetAgentId);
   // KOSBLING-PATCH: if isolation enabled, reject explicit modelOverride from caller
-  const kosblingSecondaryModel = resolveKosblingSubagentModel(cfg);
+  const kosblingSecondaryModel = resolveEditionSubagentModel(cfg);
   if (kosblingSecondaryModel !== undefined && modelOverride) {
     return {
       status: "error",

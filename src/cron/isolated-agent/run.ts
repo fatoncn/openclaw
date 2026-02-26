@@ -10,7 +10,7 @@ import { getCliSessionId, setCliSessionId } from "../../agents/cli-session.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { resolveCronStyleNow } from "../../agents/current-time.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
-import { resolveKosblingIsolationParams } from "../../agents/kosbling-isolation.js"; // KOSBLING-PATCH
+import { resolveEditionIsolationParams } from "../../agents/edition-isolation.js"; // KOSBLING-PATCH
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import {
@@ -253,7 +253,7 @@ export async function runCronIsolatedAgentTurn(params: {
   if (
     modelOverride !== undefined &&
     modelOverride.length > 0 &&
-    resolveKosblingIsolationParams(params.cfg, agentSessionKey, agentId) // KOSBLING-PATCH
+    resolveEditionIsolationParams(params.cfg, agentSessionKey, agentId) // KOSBLING-PATCH
   ) {
     logWarn(
       `[cron:${params.job.id}] Cron model override ignored: Kosbling model isolation policy enforces secondary model group.`,
@@ -459,7 +459,7 @@ export async function runCronIsolatedAgentTurn(params: {
     });
     const messageChannel = resolvedDelivery.channel;
     // KOSBLING-PATCH: model isolation — if kosblingParams present, always use it, never fall back to payload/session provider
-    const kosblingParams = resolveKosblingIsolationParams(params.cfg, agentSessionKey, agentId); // KOSBLING-PATCH
+    const kosblingParams = resolveEditionIsolationParams(params.cfg, agentSessionKey, agentId); // KOSBLING-PATCH
     const fallbackResult = await runWithModelFallback({
       cfg: cfgWithAgentDefaults,
       provider: kosblingParams ? kosblingParams.provider : provider,

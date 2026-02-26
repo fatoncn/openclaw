@@ -17,8 +17,8 @@
 - **CLI Banner 品牌标识**（`src/cli/banner.ts`）
   - ASCII art 下方 `✦ Kosbling Edition ✦`，单行 banner `[Kosbling Edition]`
 
-- **Model 隔离**（`src/agents/kosbling-isolation.ts` + 5 个文件）
-  - `kosbling.modelIsolation` 配置块，main/secondary 两组完全隔离
+- **Model 隔离**（`src/agents/edition-isolation.ts` + 5 个文件）
+  - `edition.modelIsolation` 配置块，main/secondary 两组完全隔离
   - `/model` 命令、cron payload、spawn 显式指定全部封死
   - 详见下方 Model 隔离章节
 
@@ -36,7 +36,7 @@ openclaw.json 配置：
 
 ```json
 {
-  "kosbling": {
+  "edition": {
     "modelIsolation": {
       "enabled": true,
       "main": { "model": "provider/model-a", "fallbacks": ["provider/model-b"] },

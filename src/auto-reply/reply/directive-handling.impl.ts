@@ -3,7 +3,7 @@ import {
   resolveAgentDir,
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
-import { resolveKosblingIsolationParams } from "../../agents/kosbling-isolation.js"; // KOSBLING-PATCH
+import { resolveEditionIsolationParams } from "../../agents/edition-isolation.js"; // KOSBLING-PATCH
 import { resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
@@ -98,10 +98,10 @@ export async function handleDirectiveOnly(
   if (
     params.directives.hasModelDirective &&
     params.directives.rawModelDirective?.trim() &&
-    resolveKosblingIsolationParams(params.cfg, params.sessionKey)
+    resolveEditionIsolationParams(params.cfg, params.sessionKey)
   ) {
     return {
-      text: "Model switching is disabled by Kosbling model isolation policy. Models are managed via kosbling.modelIsolation config.",
+      text: "Model switching is disabled by Kosbling model isolation policy. Models are managed via edition.modelIsolation config.",
     };
   }
 
