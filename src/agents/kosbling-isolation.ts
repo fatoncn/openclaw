@@ -1,5 +1,6 @@
 // KOSBLING-PATCH: model isolation
 import type { OpenClawConfig } from "../config/config.js";
+import { logInfo } from "../logger.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
 import { DEFAULT_PROVIDER } from "./defaults.js";
 import { buildModelAliasIndex, resolveModelRefFromString } from "./model-selection.js";
@@ -80,6 +81,15 @@ export function resolveKosblingIsolationParams(
     }
   }
 
+  const perAgentInfo =
+    finalProvider !== resolved.ref.provider || finalModel !== resolved.ref.model
+      ? `${finalProvider}/${finalModel}`
+      : "none";
+  const groupName = isSecondary ? "secondary" : "main";
+  logInfo(
+    `[kosbling-isolation] group=${groupName} model=${finalProvider}/${finalModel} agent=${agentId ?? "unknown"} per-agent=${perAgentInfo}`,
+  ); // KOSBLING-PATCH
+
   return {
     provider: finalProvider,
     model: finalModel,
@@ -110,5 +120,8 @@ export function resolveKosblingSubagentModel(cfg: OpenClawConfig): string | unde
   if (!resolved) {
     return undefined;
   }
+  logInfo(
+    `[kosbling-isolation] subagent-spawn model=${resolved.ref.provider}/${resolved.ref.model}`,
+  ); // KOSBLING-PATCH
   return `${resolved.ref.provider}/${resolved.ref.model}`;
 }
