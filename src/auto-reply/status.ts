@@ -704,11 +704,15 @@ export function buildStatusMessage(args: StatusArgs): string {
   // KOSBLING-PATCH: when edition isolation is active, show edition fallbacks instead of active fallback
   const fallbackLine = (() => {
     if (editionParams) {
-      const editionFallbacks = editionParams.fallbacksOverride;
-      if (editionFallbacks.length === 0) {
-        return null;
+      // KOSBLING-PATCH: when edition is active, only show fallback if actual model differs from edition primary
+      const editionPrimary = `${editionParams.provider}/${editionParams.model}`;
+      const actualModel = `${activeProvider}/${activeModel}`;
+      if (actualModel !== editionPrimary) {
+        return `↪️ Fallback: ${activeModelLabel}${
+          showFallbackAuth ? ` · 🔑 ${activeAuthLabelValue}` : ""
+        } (edition primary unavailable)`;
       }
-      return `↪️ Fallback: ${editionFallbacks.join(", ")} (edition)`;
+      return null;
     }
     return fallbackState.active
       ? `↪️ Fallback: ${activeModelLabel}${
