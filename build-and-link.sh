@@ -15,15 +15,13 @@ set -e
 
 cd "$(dirname "$0")"
 
-# 从 git tag 注入版本号到 package.json
-GIT_VERSION=$(git describe --tags --match 'v*-kosbling.*' 2>/dev/null | sed 's/^v//')
-if [ -z "$GIT_VERSION" ]; then
-  # 没有 kosbling tag，用最近的任意 tag
-  GIT_VERSION=$(git describe --tags 2>/dev/null | sed 's/^v//')
-fi
-if [ -n "$GIT_VERSION" ]; then
-  echo "📌 Version from git: $GIT_VERSION"
-  node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.version='$GIT_VERSION'; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+# 从 VERSION 文件读取版本号注入 package.json
+if [ -f "VERSION" ]; then
+  APP_VERSION=$(cat VERSION | tr -d '[:space:]')
+  echo "📌 Version: $APP_VERSION"
+  node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.version='$APP_VERSION'; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+else
+  echo "⚠️  VERSION file not found, using package.json version as-is"
 fi
 
 echo "📦 Installing dependencies..."
