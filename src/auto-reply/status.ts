@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { resolveEditionIsolationParams } from "../agents/edition-isolation.js"; // KOSBLING-PATCH
 import { resolveModelAuthMode } from "../agents/model-auth.js";
 import {
   buildModelAliasIndex,
@@ -609,10 +610,23 @@ export function buildStatusMessage(args: StatusArgs): string {
   const activeAuthLabelValue =
     args.activeModelAuth ??
     (activeAuthMode && activeAuthMode !== "unknown" ? activeAuthMode : undefined);
-  const selectedModelLabel = modelRefs.selected.label || "unknown";
+  // KOSBLING-PATCH: resolve edition isolation params to override model display
+  const editionParams = args.config
+    ? resolveEditionIsolationParams(args.config, args.sessionKey, args.agentId)
+    : null;
+
+  // If edition isolation is active, use edition's effective provider/model for display
+  const displaySelectedModelLabel = editionParams
+    ? formatProviderModelRef(editionParams.provider, editionParams.model) || "unknown"
+    : modelRefs.selected.label || "unknown";
+  // KOSBLING-PATCH end
+
+  const selectedModelLabel = displaySelectedModelLabel;
   const activeModelLabel = formatProviderModelRef(activeProvider, activeModel) || "unknown";
   const fallbackState = resolveActiveFallbackState({
-    selectedModelRef: selectedModelLabel,
+    selectedModelRef: editionParams
+      ? displaySelectedModelLabel
+      : modelRefs.selected.label || "unknown",
     activeModelRef: activeModelLabel,
     state: entry,
   });
@@ -642,6 +656,11 @@ export function buildStatusMessage(args: StatusArgs): string {
 
   const selectedAuthLabel = selectedAuthLabelValue ? ` · 🔑 ${selectedAuthLabelValue}` : "";
   const channelModelNote = (() => {
+    // KOSBLING-PATCH: skip channel override note when edition isolation is active
+    if (editionParams) {
+      return undefined;
+    }
+    // KOSBLING-PATCH end
     if (!args.config || !entry) {
       return undefined;
     }
@@ -682,11 +701,22 @@ export function buildStatusMessage(args: StatusArgs): string {
   const modelNote = channelModelNote ? ` · ${channelModelNote}` : "";
   const modelLine = `🧠 Model: ${selectedModelLabel}${selectedAuthLabel}${modelNote}`;
   const showFallbackAuth = activeAuthLabelValue && activeAuthLabelValue !== selectedAuthLabelValue;
-  const fallbackLine = fallbackState.active
-    ? `↪️ Fallback: ${activeModelLabel}${
-        showFallbackAuth ? ` · 🔑 ${activeAuthLabelValue}` : ""
-      } (${fallbackState.reason ?? "selected model unavailable"})`
-    : null;
+  // KOSBLING-PATCH: when edition isolation is active, show edition fallbacks instead of active fallback
+  const fallbackLine = (() => {
+    if (editionParams) {
+      const editionFallbacks = editionParams.fallbacksOverride;
+      if (editionFallbacks.length === 0) {
+        return null;
+      }
+      return `↪️ Fallback: ${editionFallbacks.join(", ")} (edition)`;
+    }
+    return fallbackState.active
+      ? `↪️ Fallback: ${activeModelLabel}${
+          showFallbackAuth ? ` · 🔑 ${activeAuthLabelValue}` : ""
+        } (${fallbackState.reason ?? "selected model unavailable"})`
+      : null;
+  })();
+  // KOSBLING-PATCH end
   const commit = resolveCommitHash();
   const versionLine = `🦞 OpenClaw ${VERSION}${commit ? ` (${commit})` : ""}`;
   const usagePair = formatUsagePair(inputTokens, outputTokens);
