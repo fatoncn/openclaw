@@ -37,7 +37,23 @@ RUNTIME_REPO="$HOME/.openclaw-kosbling"
 CURRENT_DIR="$(realpath "$(pwd)")"
 
 if [ "$CURRENT_DIR" = "$(realpath "$RUNTIME_REPO" 2>/dev/null)" ]; then
-  # 运行仓库：卸载旧的 + link
+  # 运行仓库：先停 gateway
+  echo "🛑 Stopping gateway before link..."
+  if openclaw gateway status 2>/dev/null | grep -q "running"; then
+    echo "   Gateway is running, stopping..."
+    openclaw gateway stop 2>&1 || true
+    # 等待进程退出
+    sleep 2
+    if lsof -i :18789 -t >/dev/null 2>&1; then
+      echo "   ⚠️  Port 18789 still in use, waiting..."
+      sleep 3
+    fi
+    echo "   ✅ Gateway stopped"
+  else
+    echo "   Gateway not running, skipping stop"
+  fi
+
+  # 卸载旧的 + link
   CURRENT_LINK=$(npm ls -g openclaw --parseable 2>/dev/null || true)
   if [ -n "$CURRENT_LINK" ] && [ "$(realpath "$CURRENT_LINK" 2>/dev/null)" != "$CURRENT_DIR" ]; then
     echo "🗑️  Removing existing openclaw global install..."
@@ -46,6 +62,16 @@ if [ "$CURRENT_DIR" = "$(realpath "$RUNTIME_REPO" 2>/dev/null)" ]; then
 
   echo "🔗 Linking to global CLI..."
   npm link
+
+  # 重启 gateway
+  echo "🚀 Starting gateway..."
+  openclaw gateway start 2>&1 || true
+  sleep 2
+  if openclaw gateway status 2>/dev/null | grep -q "running"; then
+    echo "   ✅ Gateway started"
+  else
+    echo "   ⚠️  Gateway may not have started, check: openclaw gateway status"
+  fi
 
   echo ""
   echo "✅ OpenClaw Kosbling Edition ready!"
