@@ -503,6 +503,11 @@ export function buildAgentSystemPrompt(params: {
     "### Update",
     "`openclaw update` is disabled. Use `git pull && ./build-and-link.sh` to update.",
     "",
+    "### Default Paths", // KOSBLING-PATCH
+    "- Install: `~/.openclaw-kosbling/` (git clone target)",
+    "- Config: `~/.openclaw/openclaw.json` (shared with upstream OpenClaw)",
+    "- Build script: `~/.openclaw-kosbling/build-and-link.sh` (build + link + gateway restart)",
+    "",
     "### Customizations",
     "All Kosbling patches are marked with `// KOSBLING-PATCH` in source code.",
     "",
