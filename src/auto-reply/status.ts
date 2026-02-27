@@ -705,6 +705,12 @@ export function buildStatusMessage(args: StatusArgs): string {
   const fallbackLine = (() => {
     if (editionParams) {
       // KOSBLING-PATCH: when edition is active, only show fallback if actual model differs from edition primary
+      // But only when we have a runtime model — before first request, activeModel falls back to
+      // agents.defaults which may differ from edition primary (not a real fallback)
+      const hasRuntimeModel = Boolean(entry?.model);
+      if (!hasRuntimeModel) {
+        return null;
+      }
       const editionPrimary = `${editionParams.provider}/${editionParams.model}`;
       const actualModel = `${activeProvider}/${activeModel}`;
       if (actualModel !== editionPrimary) {
