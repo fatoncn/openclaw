@@ -166,6 +166,10 @@ export function resolveFailoverReasonFromError(err: unknown): FailoverReason | n
   if (status === 503) {
     return "timeout";
   }
+  // KOSBLING-PATCH: 529 is Anthropic's non-standard "overloaded" status — treat as timeout to trigger fallback
+  if (status === 529) {
+    return "timeout";
+  }
   if (status === 400) {
     return "format";
   }
