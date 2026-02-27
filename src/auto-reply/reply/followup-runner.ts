@@ -129,10 +129,10 @@ export function createFollowupRunner(params: {
         const fallbackResult = await runWithModelFallback({
           // KOSBLING-PATCH
           ...resolveModelFallbackOptions(queued.run), // KOSBLING-PATCH
-          run: (provider, model) => {
+          run: async (provider, model) => {
             // KOSBLING-PATCH
             const authProfile = resolveRunAuthProfile(queued.run, provider);
-            return runEmbeddedPiAgent({
+            const result = await runEmbeddedPiAgent({
               sessionId: queued.run.sessionId,
               sessionKey: queued.run.sessionKey,
               agentId: queued.run.agentId,
@@ -178,6 +178,16 @@ export function createFollowupRunner(params: {
                 }
               },
             });
+            // KOSBLING-PATCH: runEmbeddedPiAgent swallows errors as isError payloads instead of throwing.
+            // Re-throw so model-fallback can try the next candidate.
+            if (result.meta?.error) {
+              const errMeta = result.meta.error as { kind: string; message: string };
+              throw Object.assign(new Error(errMeta.message), {
+                failoverKind: errMeta.kind,
+                status: 529,
+              });
+            }
+            return result;
           },
           onError: ({ provider, model, error, attempt, total }) => {
             // KOSBLING-PATCH: log LLM errors to file
