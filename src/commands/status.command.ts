@@ -164,7 +164,7 @@ export async function statusCommand(
           nodeService: nodeDaemon,
           agents: agentStatus,
           securityAudit,
-          modelIsolation: cfg.edition?.modelIsolation ?? null, // KOSBLING-PATCH
+          modelIsolation: cfg.modelIsolation ?? null, // KOSBLING-PATCH
           ...(health || usage || lastHeartbeat ? { health, usage, lastHeartbeat } : {}),
         },
         null,
@@ -355,7 +355,7 @@ export async function statusCommand(
 
   // KOSBLING-PATCH: model isolation display
   const modelIsolationValue = (() => {
-    const isolation = cfg.edition?.modelIsolation;
+    const isolation = cfg.modelIsolation;
     if (!isolation?.enabled) {
       return "🔓 disabled";
     }

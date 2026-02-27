@@ -256,7 +256,7 @@ export async function runCronIsolatedAgentTurn(params: {
     resolveEditionIsolationParams(params.cfg, agentSessionKey, agentId) // KOSBLING-PATCH
   ) {
     logWarn(
-      `[cron:${params.job.id}] Cron model override "${modelOverride}" ignored: edition model isolation enforces secondary model group.`,
+      `[cron:${params.job.id}] Cron model override "${modelOverride}" ignored: model isolation enforces secondary model group.`,
     );
     modelOverride = undefined; // KOSBLING-PATCH: actually ignore the override
   }

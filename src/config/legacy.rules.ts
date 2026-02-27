@@ -138,4 +138,10 @@ export const LEGACY_CONFIG_RULES: LegacyConfigRule[] = [
     path: ["kosbling"],
     message: "kosbling config key was renamed to edition (auto-migrated on load).",
   },
+  // KOSBLING-PATCH
+  {
+    path: ["edition", "modelIsolation"],
+    message:
+      "edition.modelIsolation has been moved to root-level modelIsolation (auto-migrated on load).",
+  },
 ];

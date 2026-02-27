@@ -577,37 +577,32 @@ export const OpenClawSchema = z
       .optional(),
     memory: MemorySchema,
     // KOSBLING-PATCH: model isolation
-    edition: z
+    modelIsolation: z
       .object({
-        modelIsolation: z
+        enabled: z.boolean().optional(),
+        main: z
           .object({
-            enabled: z.boolean().optional(),
-            main: z
-              .object({
-                model: z.string().optional(),
-                fallbacks: z.array(z.string()).optional(),
-              })
-              .strict()
-              .optional(),
-            secondary: z
-              .object({
-                model: z.string().optional(),
-                fallbacks: z.array(z.string()).optional(),
-              })
-              .strict()
-              .optional(),
-            agents: z // KOSBLING-PATCH
-              .record(
-                z.string(),
-                z
-                  .object({
-                    model: z.string(),
-                  })
-                  .strict(),
-              )
-              .optional(),
+            model: z.string().optional(),
+            fallbacks: z.array(z.string()).optional(),
           })
           .strict()
+          .optional(),
+        secondary: z
+          .object({
+            model: z.string().optional(),
+            fallbacks: z.array(z.string()).optional(),
+          })
+          .strict()
+          .optional(),
+        agents: z // KOSBLING-PATCH
+          .record(
+            z.string(),
+            z
+              .object({
+                model: z.string(),
+              })
+              .strict(),
+          )
           .optional(),
       })
       .strict()

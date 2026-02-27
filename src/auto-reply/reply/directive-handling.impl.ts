@@ -101,7 +101,7 @@ export async function handleDirectiveOnly(
     resolveEditionIsolationParams(params.cfg, params.sessionKey)
   ) {
     return {
-      text: "Model switching is disabled by Kosbling model isolation policy. Models are managed via edition.modelIsolation config.",
+      text: "Model switching is disabled by Kosbling model isolation policy. Models are managed via modelIsolation config.",
     };
   }
 

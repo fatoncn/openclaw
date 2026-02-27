@@ -21,7 +21,7 @@ export function resolveEditionIsolationParams(
   sessionKey: string | undefined | null,
   agentId?: string, // KOSBLING-PATCH
 ): EditionIsolationParams {
-  const isolation = cfg.edition?.modelIsolation;
+  const isolation = cfg.modelIsolation;
   if (!isolation?.enabled) {
     return null;
   }
@@ -102,7 +102,7 @@ export function resolveEditionIsolationParams(
  * Returns undefined if isolation is disabled or not configured.
  */
 export function resolveEditionSubagentModel(cfg: OpenClawConfig): string | undefined {
-  const isolation = cfg.edition?.modelIsolation;
+  const isolation = cfg.modelIsolation;
   if (!isolation?.enabled) {
     return undefined;
   }

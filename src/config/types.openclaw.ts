@@ -98,25 +98,23 @@ export type OpenClawConfig = {
   gateway?: GatewayConfig;
   memory?: MemoryConfig;
   // KOSBLING-PATCH: model isolation
-  edition?: {
-    modelIsolation?: {
-      enabled?: boolean;
-      main?: {
-        model?: string;
-        fallbacks?: string[];
-      };
-      secondary?: {
-        model?: string;
-        fallbacks?: string[];
-      };
-      agents?: Record<
-        string,
-        {
-          // KOSBLING-PATCH
-          model?: string;
-        }
-      >;
+  modelIsolation?: {
+    enabled?: boolean;
+    main?: {
+      model?: string;
+      fallbacks?: string[];
     };
+    secondary?: {
+      model?: string;
+      fallbacks?: string[];
+    };
+    agents?: Record<
+      string,
+      {
+        // KOSBLING-PATCH
+        model?: string;
+      }
+    >;
   };
 };
 

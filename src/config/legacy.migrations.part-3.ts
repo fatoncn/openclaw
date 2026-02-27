@@ -211,6 +211,32 @@ export const LEGACY_CONFIG_MIGRATIONS_PART_3: LegacyConfigMigration[] = [
       delete raw.kosbling;
     },
   },
+  // KOSBLING-PATCH
+  {
+    id: "edition.modelIsolation->modelIsolation",
+    describe: "Move edition.modelIsolation to root-level modelIsolation",
+    apply: (raw, changes) => {
+      const edition = getRecord(raw.edition);
+      if (!edition) {
+        return;
+      }
+      const modelIsolation = getRecord(edition.modelIsolation);
+      if (!modelIsolation) {
+        return;
+      }
+      if (!raw.modelIsolation) {
+        raw.modelIsolation = modelIsolation;
+        changes.push("Migrated edition.modelIsolation to root-level modelIsolation");
+      } else {
+        changes.push("Removed edition.modelIsolation (root modelIsolation already set)");
+      }
+      delete edition.modelIsolation;
+      // Clean up empty edition object
+      if (Object.keys(edition).length === 0) {
+        delete raw.edition;
+      }
+    },
+  },
   {
     id: "identity->agents.list",
     describe: "Move identity to agents.list[].identity",

@@ -409,7 +409,7 @@ const formatEditionIsolationLine = (
   if (!config) {
     return null;
   }
-  const isolation = config.edition?.modelIsolation;
+  const isolation = config.modelIsolation;
   if (!isolation?.enabled) {
     return null;
   }
