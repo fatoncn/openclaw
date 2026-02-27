@@ -7,6 +7,7 @@ import type { SessionEntry } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js"; // KOSBLING-PATCH
 import { defaultRuntime } from "../../runtime.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
@@ -179,10 +180,10 @@ export function createFollowupRunner(params: {
             });
           },
           onError: ({ provider, model, error, attempt, total }) => {
-            // KOSBLING-PATCH: log LLM errors
+            // KOSBLING-PATCH: log LLM errors to file
             const msg = error instanceof Error ? error.message : String(error);
-            defaultRuntime.error?.(
-              `[model-fallback] attempt ${attempt}/${total} failed: ${provider}/${model}: ${msg}`,
+            createSubsystemLogger("agent/model-fallback").error(
+              `attempt ${attempt}/${total} failed: ${provider}/${model}: ${msg}`,
             );
           },
         });
