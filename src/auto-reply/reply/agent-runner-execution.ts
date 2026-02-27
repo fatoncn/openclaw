@@ -414,6 +414,13 @@ export async function runAgentTurnWithFallback(params: {
               : undefined,
           });
         },
+        onError: ({ provider, model, error, attempt, total }) => {
+          // KOSBLING-PATCH: log LLM errors
+          const msg = error instanceof Error ? error.message : String(error);
+          defaultRuntime.error?.(
+            `[model-fallback] attempt ${attempt}/${total} failed: ${provider}/${model}: ${msg}`,
+          );
+        },
       });
       runResult = fallbackResult.result;
       fallbackProvider = fallbackResult.provider;

@@ -1,10 +1,9 @@
 import crypto from "node:crypto";
-import { resolveAgentModelFallbacksOverride } from "../../agents/agent-scope.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
-import { resolveAgentIdFromSessionKey, type SessionEntry } from "../../config/sessions.js";
+import type { SessionEntry } from "../../config/sessions.js";
 import type { TypingMode } from "../../config/types.js";
 import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
@@ -13,7 +12,7 @@ import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
-import { resolveRunAuthProfile } from "./agent-runner-utils.js";
+import { resolveModelFallbackOptions, resolveRunAuthProfile } from "./agent-runner-utils.js"; // KOSBLING-PATCH
 import type { FollowupRun } from "./queue.js";
 import {
   applyReplyThreading,
@@ -127,15 +126,10 @@ export function createFollowupRunner(params: {
       let fallbackModel = queued.run.model;
       try {
         const fallbackResult = await runWithModelFallback({
-          cfg: queued.run.config,
-          provider: queued.run.provider,
-          model: queued.run.model,
-          agentDir: queued.run.agentDir,
-          fallbacksOverride: resolveAgentModelFallbacksOverride(
-            queued.run.config,
-            resolveAgentIdFromSessionKey(queued.run.sessionKey),
-          ),
+          // KOSBLING-PATCH
+          ...resolveModelFallbackOptions(queued.run), // KOSBLING-PATCH
           run: (provider, model) => {
+            // KOSBLING-PATCH
             const authProfile = resolveRunAuthProfile(queued.run, provider);
             return runEmbeddedPiAgent({
               sessionId: queued.run.sessionId,
@@ -183,6 +177,13 @@ export function createFollowupRunner(params: {
                 }
               },
             });
+          },
+          onError: ({ provider, model, error, attempt, total }) => {
+            // KOSBLING-PATCH: log LLM errors
+            const msg = error instanceof Error ? error.message : String(error);
+            defaultRuntime.error?.(
+              `[model-fallback] attempt ${attempt}/${total} failed: ${provider}/${model}: ${msg}`,
+            );
           },
         });
         runResult = fallbackResult.result;
