@@ -1,6 +1,6 @@
 # OpenClaw — Kosbling Edition
 
-基于 [OpenClaw](https://github.com/openclaw/openclaw) 的定制 fork，用于 Kosbling AI 电商助手平台。
+基于 [OpenClaw](https://github.com/openclaw/openclaw) 的定制 fork，用于 [Kosbling AI Studio](https://kosbling.ai) 电商助手平台。
 
 ## 与上游的关系
 
@@ -12,15 +12,17 @@
 
 所有改动在源码中标记 `// KOSBLING-PATCH`。
 
-### 已完成
+### 功能改造
+
+- **Model 隔离**（`src/agents/edition-isolation.ts` + 多个文件）
+  - 根级 `modelIsolation` 配置块，main/secondary 两组完全隔离
+  - `/model` 命令、cron payload、spawn 显式指定全部封死
+  - 支持 per-agent model override（必须在组 allowlist 内）
+  - 详见下方 [Model 隔离](#model-隔离) 章节
+  - 已向官方提交 [Feature Proposal](https://github.com/openclaw/openclaw/discussions/28314)
 
 - **CLI Banner 品牌标识**（`src/cli/banner.ts`）
   - ASCII art 下方 `✦ Kosbling Edition ✦`，单行 banner `[Kosbling Edition]`
-
-- **Model 隔离**（`src/agents/edition-isolation.ts` + 5 个文件）
-  - `edition.modelIsolation` 配置块，main/secondary 两组完全隔离
-  - `/model` 命令、cron payload、spawn 显式指定全部封死
-  - 详见下方 Model 隔离章节
 
 - **更新机制禁用**（`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`）
   - `openclaw update` 提示用 git pull 方式
@@ -30,17 +32,33 @@
   - 所有 agent 的 system prompt 中包含 Kosbling Edition 说明
   - 包括 model isolation 配置参考和定制版行为说明
 
+### Bug 修复
+
+- **HTTP 529 不触发 model fallback**（`src/agents/failover-error.ts`）
+  - 上游 `resolveFailoverReasonFromError` 不识别 529（Anthropic overloaded），导致 fallback 链被跳过
+  - 上游的 `isTransientHttpError` 只在外层做一次 retry，不进入 fallback 循环
+  - 修复：将 529 加入 `resolveFailoverReasonFromError`，让内层 fallback 循环正常尝试备用模型
+  - 相关上游 issue: [#28502](https://github.com/openclaw/openclaw/issues/28502), [#8112](https://github.com/openclaw/openclaw/issues/8112)
+
+- **/status 误报 fallback**（`src/auto-reply/status.ts`）
+  - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
+  - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
+
 ### Model 隔离
 
 openclaw.json 配置：
 
 ```json
 {
-  "edition": {
-    "modelIsolation": {
-      "enabled": true,
-      "main": { "model": "provider/model-a", "fallbacks": ["provider/model-b"] },
-      "secondary": { "model": "provider/model-c", "fallbacks": ["provider/model-d"] }
+  "modelIsolation": {
+    "enabled": true,
+    "main": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallbacks": ["anthropic/claude-sonnet-4-6"]
+    },
+    "secondary": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "fallbacks": ["anthropic/claude-haiku-3-5"]
     }
   }
 }
@@ -53,17 +71,23 @@ openclaw.json 配置：
 - 两组完全隔离，fallback 不穿透，全挂则报错
 - `/model` 命令被拦截，spawn/cron 的 model 指定被拒绝并返回错误信息
 
+### 配置迁移
+
+旧配置路径 `edition.modelIsolation` 和 `kosbling.modelIsolation` 会在启动时自动迁移到根级 `modelIsolation`。
+
 ## 开发规范
+
+### 改动记录
+
+所有改动必须同步更新本 README：
+
+- **功能改造** → 记录在「功能改造」区
+- **Bug 修复** → 记录在「Bug 修复」区
+- 如涉及上游 bug，附上相关 issue 链接
 
 ### 功能改动必须同步 System Prompt
 
-任何功能改动都必须考虑是否需要更新 `src/agents/system-prompt.ts` 中的 Kosbling Edition section，确保所有 agent 知道定制版的行为变化。
-
-检查清单：
-
-1. 新增/修改了配置项？→ 更新 system prompt 中的配置说明
-2. 改变了 agent 可用的命令/工具行为？→ 更新 system prompt 中的行为说明
-3. 新增了限制或策略？→ 在 system prompt 中说明
+任何功能改动都必须考虑是否需要更新 `src/agents/system-prompt.ts` 中的 Kosbling Edition section。
 
 ### 代码标记
 
@@ -79,7 +103,7 @@ openclaw.json 配置：
 ### 首次安装（目标机器）
 
 ```bash
-git clone git@github.com:fatoncn/openclaw.git ~/.openclaw-kosbling
+git clone https://github.com/kosbling-ai/openclaw.git ~/.openclaw-kosbling
 cd ~/.openclaw-kosbling
 ./build-and-link.sh
 ```
@@ -101,7 +125,7 @@ git pull
 ```bash
 ./build-and-link.sh          # 仅构建，验证编译通过
 git add -A && git commit     # 提交
-git push origin main     # 推送
+git push origin main         # 推送
 ```
 
 然后在运行仓库（`~/.openclaw-kosbling`）pull + build 部署。
@@ -110,7 +134,7 @@ git push origin main     # 推送
 
 版本格式：`{upstream_version}-kosbling.{patch}`
 
-例如：`2026.2.21-kosbling.2`
+例如：`2026.2.21-kosbling.3`
 
 版本号维护在仓库根目录的 `VERSION` 文件中，`build-and-link.sh` 构建时自动读取并写入 `package.json`。
 
@@ -128,7 +152,7 @@ git push origin main
 ## 同步上游
 
 ```bash
-git fetch upstream-remote
+git fetch upstream
 git checkout upstream
 git merge v2026.2.xx
 git checkout main
