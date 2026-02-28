@@ -24,6 +24,9 @@
 - **CLI Banner 品牌标识**（`src/cli/banner.ts`）
   - ASCII art 下方 `✦ Kosbling Edition ✦`，单行 banner `[Kosbling Edition]`
 
+- **CLI `--version` 显示 git commit hash**（`src/cli/program/context.ts`）
+  - `openclaw -v` 输出格式：`2026.2.21-kosbling.4 (34ada4a)`
+
 - **更新机制禁用**（`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`）
   - `openclaw update` 提示用 git pull 方式
   - 启动时 update check 和 config version warning 跳过
@@ -34,13 +37,26 @@
 
 ### Bug 修复
 
-- **HTTP 529 不触发 model fallback**（`src/agents/failover-error.ts`）
-  - 上游 `resolveFailoverReasonFromError` 不识别 529（Anthropic overloaded），导致 fallback 链被跳过
-  - 上游的 `isTransientHttpError` 只在外层做一次 retry，不进入 fallback 循环
-  - 修复：将 529 加入 `resolveFailoverReasonFromError`，让内层 fallback 循环正常尝试备用模型
+> 标注 `[上游]` 的是官方代码的 bug，`[Kosbling]` 的是我们改造引入需要配套的修复。
+
+- **`[上游]` HTTP 529 不触发 model fallback**（`src/agents/failover-error.ts`）
+  - `resolveFailoverReasonFromError` 不识别 529（Anthropic overloaded），导致 fallback 链被跳过
+  - 修复：将 529 加入 `resolveFailoverReasonFromError`，映射为 "timeout" reason
   - 相关上游 issue: [#28502](https://github.com/openclaw/openclaw/issues/28502), [#8112](https://github.com/openclaw/openclaw/issues/8112)
 
-- **/status 误报 fallback**（`src/auto-reply/status.ts`）
+- **`[上游]` HTTP provider 错误（401/403/503 等）不触发 model fallback**（`src/agents/pi-embedded-runner/run.ts`）
+  - provider 返回 HTTP 错误时，错误以 `lastAssistant.stopReason="error"` 形式返回，被包装为 `isError=true` payload，不抛异常，`runWithModelFallback` 的 catch 永远捕获不到
+  - 修复：在 while 循环中检测 `stopReason="error"` 的 assistant 消息，用 `coerceToFailoverError` 分类后抛出 `FailoverError`
+
+- **`[上游]` model-fallback 日志不可见**（`src/agents/model-fallback.ts`）
+  - fallback 尝试时无任何日志输出，难以诊断
+  - 修复：添加 info-level 日志，fallback attempt 信息输出到 `gateway.log`（stdout）
+
+- **`[Kosbling]` `fallbackConfigured` 不检查 `modelIsolation` fallbacks**（`src/agents/pi-embedded-runner/run.ts`）
+  - 上游 `fallbackConfigured` 只检查 `agents.defaults.model.fallbacks`，不检查 `modelIsolation` 配置的 fallbacks，导致所有 failover 检查被跳过
+  - 修复：扩展 `fallbackConfigured` 同时检查 `modelIsolation.enabled` + `main/secondary.fallbacks`
+
+- **`[Kosbling]` /status 误报 fallback**（`src/auto-reply/status.ts`）
   - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
   - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
 
