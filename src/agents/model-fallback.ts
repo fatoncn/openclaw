@@ -394,12 +394,6 @@ export async function runWithModelFallback<T>(params: {
           attempt: i + 1,
           total: candidates.length,
         });
-        // KOSBLING-PATCH: log unrecognized errors so we can diagnose what's not being caught
-        const errMsg = err instanceof Error ? err.message : String(err);
-        const errStatus = (err as { status?: number }).status;
-        modelFallbackLog.error(
-          `unrecognized error (not failover-eligible), rethrowing: status=${errStatus ?? "n/a"} message=${errMsg}`,
-        );
         throw err;
       }
 
