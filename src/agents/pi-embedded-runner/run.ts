@@ -933,8 +933,13 @@ export async function runEmbeddedPiAgent(
           const authFailure = isAuthAssistantError(lastAssistant);
           const rateLimitFailure = isRateLimitAssistantError(lastAssistant);
           const billingFailure = isBillingAssistantError(lastAssistant);
-          const failoverFailure = isFailoverAssistantError(lastAssistant);
-          const assistantFailoverReason = classifyFailoverReason(lastAssistant?.errorMessage ?? "");
+          const assistantErrorForClassification =
+            lastAssistant?.errorMessage?.trim() || assistantErrorText || "";
+          const assistantFailoverReason =
+            classifyFailoverReason(lastAssistant?.errorMessage ?? "") ??
+            classifyFailoverReason(assistantErrorText ?? "");
+          const failoverFailure =
+            isFailoverAssistantError(lastAssistant) || assistantFailoverReason !== null;
           const cloudCodeAssistFormatError = attempt.cloudCodeAssistFormatError;
           const imageDimensionError = parseImageDimensionError(lastAssistant?.errorMessage ?? "");
 
@@ -1020,6 +1025,39 @@ export async function runEmbeddedPiAgent(
                 resolveFailoverStatus(assistantFailoverReason ?? "unknown") ??
                 (isTimeoutErrorMessage(message) ? 408 : undefined);
               throw new FailoverError(message, {
+                reason: assistantFailoverReason ?? "unknown",
+                provider: activeErrorContext.provider,
+                model: activeErrorContext.model,
+                profileId: lastProfileId,
+                status,
+              });
+            }
+          }
+
+          if (fallbackConfigured && !aborted && lastAssistant?.stopReason === "error") {
+            // KOSBLING-PATCH: assistant-level provider failures can surface as stopReason=error
+            // without promptError; force them through model fallback instead of returning payload errors.
+            const statusMatch = assistantErrorForClassification.match(
+              /\b(401|402|403|404|408|429|500|502|503|504|529)\b/,
+            );
+            const status = statusMatch?.[1] ? Number.parseInt(statusMatch[1], 10) : undefined;
+            const assistantFailoverError = coerceToFailoverError(
+              Object.assign(new Error(assistantErrorForClassification || "LLM request failed."), {
+                status,
+              }),
+              {
+                provider: activeErrorContext.provider,
+                model: activeErrorContext.model,
+                profileId: lastProfileId,
+              },
+            );
+            if (assistantFailoverError) {
+              throw assistantFailoverError;
+            }
+            // Final fallback: if the assistant stopped with an error and produced no user-visible
+            // answer text, treat this as failover-eligible unknown provider failure.
+            if ((attempt.assistantTexts?.length ?? 0) === 0 && !imageDimensionError) {
+              throw new FailoverError(assistantErrorForClassification || "LLM request failed.", {
                 reason: assistantFailoverReason ?? "unknown",
                 provider: activeErrorContext.provider,
                 model: activeErrorContext.model,
