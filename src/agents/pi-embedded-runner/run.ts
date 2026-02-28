@@ -17,7 +17,12 @@ import {
   resolveContextWindowInfo,
 } from "../context-window-guard.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../defaults.js";
-import { FailoverError, resolveFailoverStatus } from "../failover-error.js";
+import {
+  coerceToFailoverError,
+  FailoverError,
+  isFailoverError,
+  resolveFailoverStatus,
+} from "../failover-error.js";
 import {
   ensureAuthProfileStore,
   getApiKeyForModel,
@@ -811,6 +816,15 @@ export async function runEmbeddedPiAgent(
 
           if (promptError && !aborted) {
             const errorText = describeUnknownError(promptError);
+            const promptFailoverError = coerceToFailoverError(promptError, {
+              provider: activeErrorContext.provider,
+              model: activeErrorContext.model,
+              profileId: lastProfileId,
+            });
+            // KOSBLING-PATCH: bubble failover-eligible prompt errors immediately so model fallback can run.
+            if (fallbackConfigured && isFailoverError(promptFailoverError)) {
+              throw promptFailoverError;
+            }
             // Handle role ordering errors with a user-friendly message
             if (/incorrect role information|roles must alternate/i.test(errorText)) {
               return {
