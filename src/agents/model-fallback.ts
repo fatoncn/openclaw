@@ -29,6 +29,8 @@ type ModelCandidate = {
   model: string;
 };
 
+const modelFallbackLog = createSubsystemLogger("agent/model-fallback"); // KOSBLING-PATCH
+
 type FallbackAttempt = {
   provider: string;
   model: string;
@@ -384,10 +386,18 @@ export async function runWithModelFallback<T>(params: {
           model: candidate.model,
         }) ?? err;
       if (!isFailoverError(normalized)) {
+        // KOSBLING-PATCH: surface terminal attempt errors to caller hooks for diagnostics
+        await params.onError?.({
+          provider: candidate.provider,
+          model: candidate.model,
+          error: normalized,
+          attempt: i + 1,
+          total: candidates.length,
+        });
         // KOSBLING-PATCH: log unrecognized errors so we can diagnose what's not being caught
         const errMsg = err instanceof Error ? err.message : String(err);
         const errStatus = (err as { status?: number }).status;
-        createSubsystemLogger("agent/model-fallback").error(
+        modelFallbackLog.error(
           `unrecognized error (not failover-eligible), rethrowing: status=${errStatus ?? "n/a"} message=${errMsg}`,
         );
         throw err;
@@ -403,6 +413,10 @@ export async function runWithModelFallback<T>(params: {
         status: described.status,
         code: described.code,
       });
+      // KOSBLING-PATCH: emit fallback-attempt diagnostics at info level so they show in gateway.log (stdout)
+      modelFallbackLog.info(
+        `attempt ${i + 1}/${candidates.length} failed: ${candidate.provider}/${candidate.model}: ${described.message}`,
+      );
       await params.onError?.({
         provider: candidate.provider,
         model: candidate.model,
