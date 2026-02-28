@@ -231,8 +231,12 @@ export async function runEmbeddedPiAgent(
       let provider = (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
       let modelId = (params.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
       const agentDir = params.agentDir ?? resolveOpenClawAgentDir();
+      // KOSBLING-PATCH: include Kosbling modelIsolation fallbacks in failover gate.
       const fallbackConfigured =
-        (params.config?.agents?.defaults?.model?.fallbacks?.length ?? 0) > 0;
+        (params.config?.agents?.defaults?.model?.fallbacks?.length ?? 0) > 0 ||
+        (params.config?.modelIsolation?.enabled === true &&
+          ((params.config?.modelIsolation?.main?.fallbacks?.length ?? 0) > 0 ||
+            (params.config?.modelIsolation?.secondary?.fallbacks?.length ?? 0) > 0));
       await ensureOpenClawModelsJson(params.config, agentDir);
 
       // Run before_model_resolve hooks early so plugins can override the
