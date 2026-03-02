@@ -24,6 +24,7 @@ import {
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
 import { resolveAgentDir } from "../agent-scope.js";
 import { formatUserTime, resolveUserTimeFormat, resolveUserTimezone } from "../date-time.js";
+import { resolveEditionIsolationParams } from "../edition-isolation.js"; // KOSBLING-PATCH
 import { resolveModelAuthLabel } from "../model-auth-label.js";
 import { loadModelCatalog } from "../model-catalog.js";
 import {
@@ -365,12 +366,16 @@ export function createSessionStatusTool(opts?: {
         sessionKey: resolved.key,
         sessionStorePath: storePath,
         groupActivation,
+        // KOSBLING-PATCH: use edition isolation provider for auth label when isolation is active,
+        // so the 🔑 key shown in /status matches the actual model being used (e.g. anthropic-babelark).
         modelAuth: resolveModelAuthLabel({
-          provider: providerForCard,
+          provider:
+            resolveEditionIsolationParams(cfg, resolved.key, agentId)?.provider ?? providerForCard,
           cfg,
           sessionEntry: resolved.entry,
           agentDir,
         }),
+        // KOSBLING-PATCH end
         usageLine,
         timeLine,
         queue: {
