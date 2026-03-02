@@ -12,6 +12,7 @@ import { clearSessionAuthProfileOverride } from "../agents/auth-profiles/session
 import { runCliAgent } from "../agents/cli-runner.js";
 import { getCliSessionId } from "../agents/cli-session.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { resolveIsolationAwareModelSelection } from "../agents/edition-isolation.js";
 import { AGENT_LANE_SUBAGENT } from "../agents/lanes.js";
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import { runWithModelFallback } from "../agents/model-fallback.js";
@@ -366,7 +367,15 @@ export async function agentCommand(
       sessionEntry = next;
     }
 
-    const agentModelPrimary = resolveAgentModelPrimary(cfg, sessionAgentId);
+    const isolationSelection = resolveIsolationAwareModelSelection({
+      cfg,
+      sessionKey,
+      agentId: sessionAgentId,
+    });
+    const isolationEnabled = isolationSelection.isolated;
+    const agentModelPrimary = isolationEnabled
+      ? undefined
+      : resolveAgentModelPrimary(cfg, sessionAgentId);
     const cfgForModelSelection = agentModelPrimary
       ? {
           ...cfg,
@@ -385,11 +394,13 @@ export async function agentCommand(
         }
       : cfg;
 
-    const configuredDefaultRef = resolveConfiguredModelRef({
-      cfg: cfgForModelSelection,
-      defaultProvider: DEFAULT_PROVIDER,
-      defaultModel: DEFAULT_MODEL,
-    });
+    const configuredDefaultRef = isolationEnabled
+      ? { provider: isolationSelection.provider, model: isolationSelection.model }
+      : resolveConfiguredModelRef({
+          cfg: cfgForModelSelection,
+          defaultProvider: DEFAULT_PROVIDER,
+          defaultModel: DEFAULT_MODEL,
+        });
     const { provider: defaultProvider, model: defaultModel } = normalizeModelRef(
       configuredDefaultRef.provider,
       configuredDefaultRef.model,
@@ -397,9 +408,8 @@ export async function agentCommand(
     let provider = defaultProvider;
     let model = defaultModel;
     const hasAllowlist = agentCfg?.models && Object.keys(agentCfg.models).length > 0;
-    const hasStoredOverride = Boolean(
-      sessionEntry?.modelOverride || sessionEntry?.providerOverride,
-    );
+    const hasStoredOverride =
+      !isolationEnabled && Boolean(sessionEntry?.modelOverride || sessionEntry?.providerOverride);
     const needsModelCatalog = hasAllowlist || hasStoredOverride;
     let allowedModelKeys = new Set<string>();
     let allowedModelCatalog: Awaited<ReturnType<typeof loadModelCatalog>> = [];
@@ -445,9 +455,11 @@ export async function agentCommand(
       }
     }
 
-    const storedProviderOverride = sessionEntry?.providerOverride?.trim();
-    const storedModelOverride = sessionEntry?.modelOverride?.trim();
-    if (storedModelOverride) {
+    const storedProviderOverride = isolationEnabled
+      ? undefined
+      : sessionEntry?.providerOverride?.trim();
+    const storedModelOverride = isolationEnabled ? undefined : sessionEntry?.modelOverride?.trim();
+    if (!isolationEnabled && storedModelOverride) {
       const candidateProvider = storedProviderOverride || defaultProvider;
       const normalizedStored = normalizeModelRef(candidateProvider, storedModelOverride);
       const key = modelKey(normalizedStored.provider, normalizedStored.model);
@@ -551,11 +563,13 @@ export async function agentCommand(
       const spawnedBy = opts.spawnedBy ?? sessionEntry?.spawnedBy;
       // Keep fallback candidate resolution centralized so session model overrides,
       // per-agent overrides, and default fallbacks stay consistent across callers.
-      const effectiveFallbacksOverride = resolveEffectiveModelFallbacks({
-        cfg,
-        agentId: sessionAgentId,
-        hasSessionModelOverride: Boolean(storedModelOverride),
-      });
+      const effectiveFallbacksOverride = isolationEnabled
+        ? (isolationSelection.fallbacksOverride ?? [])
+        : resolveEffectiveModelFallbacks({
+            cfg,
+            agentId: sessionAgentId,
+            hasSessionModelOverride: Boolean(storedModelOverride),
+          });
 
       // Track model fallback attempts so retries on an existing session don't
       // re-inject the original prompt as a duplicate user message.

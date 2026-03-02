@@ -1,4 +1,5 @@
 import type { ExecToolDefaults } from "../../agents/bash-tools.js";
+import { isModelIsolationEnabled } from "../../agents/edition-isolation.js";
 import type { ModelAliasIndex } from "../../agents/model-selection.js";
 import { resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import type { SkillCommandSpec } from "../../agents/skills.js";
@@ -139,6 +140,7 @@ export async function resolveReplyDirectives(params: {
   } = params;
   let provider = initialProvider;
   let model = initialModel;
+  const isolationEnabled = isModelIsolationEnabled(cfg);
 
   // Prefer CommandBody/RawBody (clean message without structural context) for directive parsing.
   // Keep `Body`/`BodyStripped` as the best-available prompt text (may include context).
@@ -385,6 +387,7 @@ export async function resolveReplyDirectives(params: {
     model,
     hasModelDirective: directives.hasModelDirective,
     hasResolvedHeartbeatModelOverride,
+    isolationEnabled,
   });
   provider = modelState.provider;
   model = modelState.model;

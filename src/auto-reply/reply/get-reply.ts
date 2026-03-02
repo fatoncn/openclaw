@@ -4,6 +4,7 @@ import {
   resolveSessionAgentId,
   resolveAgentSkillsFilter,
 } from "../../agents/agent-scope.js";
+import { isModelIsolationEnabled } from "../../agents/edition-isolation.js";
 import { resolveModelRefFromString } from "../../agents/model-selection.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
 import { DEFAULT_AGENT_WORKSPACE_DIR, ensureAgentWorkspace } from "../../agents/workspace.js";
@@ -76,11 +77,13 @@ export async function getReplyFromConfig(
   const { defaultProvider, defaultModel, aliasIndex } = resolveDefaultModel({
     cfg,
     agentId,
+    sessionKey: agentSessionKey,
   });
   let provider = defaultProvider;
   let model = defaultModel;
+  const isolationEnabled = isModelIsolationEnabled(cfg);
   let hasResolvedHeartbeatModelOverride = false;
-  if (opts?.isHeartbeat) {
+  if (opts?.isHeartbeat && !isolationEnabled) {
     // Prefer the resolved per-agent heartbeat model passed from the heartbeat runner,
     // fall back to the global defaults heartbeat model for backward compatibility.
     const heartbeatRaw =
@@ -198,7 +201,12 @@ export async function getReplyFromConfig(
   const hasSessionModelOverride = Boolean(
     sessionEntry.modelOverride?.trim() || sessionEntry.providerOverride?.trim(),
   );
-  if (!hasResolvedHeartbeatModelOverride && !hasSessionModelOverride && channelModelOverride) {
+  if (
+    !isolationEnabled &&
+    !hasResolvedHeartbeatModelOverride &&
+    !hasSessionModelOverride &&
+    channelModelOverride
+  ) {
     const resolved = resolveModelRefFromString({
       raw: channelModelOverride.model,
       defaultProvider,

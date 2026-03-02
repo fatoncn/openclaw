@@ -24,14 +24,17 @@ import {
 import { applyModelOverrideToSessionEntry } from "../../sessions/model-overrides.js";
 import { resolveAgentDir } from "../agent-scope.js";
 import { formatUserTime, resolveUserTimeFormat, resolveUserTimezone } from "../date-time.js";
-import { resolveEditionIsolationParams } from "../edition-isolation.js"; // KOSBLING-PATCH
+import {
+  isModelIsolationEnabled,
+  resolveEditionIsolationParams,
+  resolveIsolationAwareModelSelection,
+} from "../edition-isolation.js"; // KOSBLING-PATCH
 import { resolveModelAuthLabel } from "../model-auth-label.js";
 import { loadModelCatalog } from "../model-catalog.js";
 import {
   buildAllowedModelSet,
   buildModelAliasIndex,
   modelKey,
-  resolveDefaultModelForAgent,
   resolveModelRefFromString,
 } from "../model-selection.js";
 import type { AnyAgentTool } from "./common.js";
@@ -115,6 +118,7 @@ async function resolveModelOverride(params: {
   raw: string;
   sessionEntry?: SessionEntry;
   agentId: string;
+  sessionKey?: string;
 }): Promise<
   | { kind: "reset" }
   | {
@@ -132,8 +136,9 @@ async function resolveModelOverride(params: {
     return { kind: "reset" };
   }
 
-  const configDefault = resolveDefaultModelForAgent({
+  const configDefault = resolveIsolationAwareModelSelection({
     cfg: params.cfg,
+    sessionKey: params.sessionKey,
     agentId: params.agentId,
   });
   const currentProvider = params.sessionEntry?.providerOverride?.trim() || configDefault.provider;
@@ -259,15 +264,27 @@ export function createSessionStatusTool(opts?: {
         throw new Error(`Unknown ${kind}: ${requestedKeyRaw}`);
       }
 
-      const configured = resolveDefaultModelForAgent({ cfg, agentId });
+      const configured = resolveIsolationAwareModelSelection({
+        cfg,
+        sessionKey: resolved.key,
+        agentId,
+      });
+      const isolationEnabled = isModelIsolationEnabled(cfg);
       const modelRaw = readStringParam(params, "model");
       let changedModel = false;
       if (typeof modelRaw === "string") {
+        const trimmedModel = modelRaw.trim().toLowerCase();
+        if (isolationEnabled && trimmedModel && trimmedModel !== "default") {
+          throw new Error(
+            "Model switching is disabled by modelIsolation policy. Models are managed via modelIsolation config.",
+          );
+        }
         const selection = await resolveModelOverride({
           cfg,
           raw: modelRaw,
           sessionEntry: resolved.entry,
           agentId,
+          sessionKey: resolved.key,
         });
         const nextEntry: SessionEntry = { ...resolved.entry };
         const applied = applyModelOverrideToSessionEntry({
@@ -296,7 +313,9 @@ export function createSessionStatusTool(opts?: {
       }
 
       const agentDir = resolveAgentDir(cfg, agentId);
-      const providerForCard = resolved.entry.providerOverride?.trim() || configured.provider;
+      const providerForCard = isolationEnabled
+        ? configured.provider
+        : (resolved.entry.providerOverride?.trim() ?? configured.provider);
       const usageProvider = resolveUsageProviderId(providerForCard);
       let usageLine: string | undefined;
       if (usageProvider) {

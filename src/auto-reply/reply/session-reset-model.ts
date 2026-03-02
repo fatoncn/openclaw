@@ -1,3 +1,4 @@
+import { isModelIsolationEnabled } from "../../agents/edition-isolation.js";
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import {
   buildAllowedModelSet,
@@ -100,6 +101,9 @@ export async function applyResetModelOverride(params: {
   aliasIndex: ModelAliasIndex;
 }): Promise<ResetModelResult> {
   if (!params.resetTriggered) {
+    return {};
+  }
+  if (isModelIsolationEnabled(params.cfg)) {
     return {};
   }
   const rawBody = params.bodyStripped?.trim();

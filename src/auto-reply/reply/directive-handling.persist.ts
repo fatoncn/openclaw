@@ -6,10 +6,13 @@ import {
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import {
+  isModelIsolationEnabled,
+  resolveIsolationAwareModelSelection,
+} from "../../agents/edition-isolation.js";
+import {
   buildModelAliasIndex,
   type ModelAliasIndex,
   modelKey,
-  resolveDefaultModelForAgent,
   resolveModelRefFromString,
 } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
@@ -137,7 +140,7 @@ export async function persistInlineDirectives(params: {
       directives.hasModelDirective && params.effectiveModelDirective
         ? params.effectiveModelDirective
         : undefined;
-    if (modelDirective) {
+    if (modelDirective && !isModelIsolationEnabled(cfg)) {
       const resolved = resolveModelRefFromString({
         raw: modelDirective,
         defaultProvider,
@@ -216,14 +219,19 @@ export async function persistInlineDirectives(params: {
   };
 }
 
-export function resolveDefaultModel(params: { cfg: OpenClawConfig; agentId?: string }): {
+export function resolveDefaultModel(params: {
+  cfg: OpenClawConfig;
+  agentId?: string;
+  sessionKey?: string;
+}): {
   defaultProvider: string;
   defaultModel: string;
   aliasIndex: ModelAliasIndex;
 } {
-  const mainModel = resolveDefaultModelForAgent({
+  const mainModel = resolveIsolationAwareModelSelection({
     cfg: params.cfg,
     agentId: params.agentId,
+    sessionKey: params.sessionKey,
   });
   const defaultProvider = mainModel.provider;
   const defaultModel = mainModel.model;

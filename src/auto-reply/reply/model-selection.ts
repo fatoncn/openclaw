@@ -274,6 +274,8 @@ export async function createModelSelectionState(params: {
   /** True when heartbeat.model was explicitly resolved for this run.
    *  In that case, skip session-stored overrides so the heartbeat selection wins. */
   hasResolvedHeartbeatModelOverride?: boolean;
+  /** When true, ignore session/parent model overrides. */
+  isolationEnabled?: boolean;
 }): Promise<ModelSelectionState> {
   const {
     cfg,
@@ -291,13 +293,14 @@ export async function createModelSelectionState(params: {
   let model = params.model;
 
   const hasAllowlist = agentCfg?.models && Object.keys(agentCfg.models).length > 0;
+  const isolationEnabled = params.isolationEnabled === true;
   const initialStoredOverride = resolveStoredModelOverride({
     sessionEntry,
     sessionStore,
     sessionKey,
     parentSessionKey,
   });
-  const hasStoredOverride = Boolean(initialStoredOverride);
+  const hasStoredOverride = !isolationEnabled && Boolean(initialStoredOverride);
   const needsModelCatalog = params.hasModelDirective || hasAllowlist || hasStoredOverride;
 
   let allowedModelKeys = new Set<string>();
@@ -350,7 +353,7 @@ export async function createModelSelectionState(params: {
   // was resolved. Heartbeat runs without heartbeat.model should still inherit
   // the regular session/parent model override behavior.
   const skipStoredOverride = params.hasResolvedHeartbeatModelOverride === true;
-  if (storedOverride?.model && !skipStoredOverride) {
+  if (storedOverride?.model && !skipStoredOverride && !isolationEnabled) {
     const candidateProvider = storedOverride.provider || defaultProvider;
     const key = modelKey(candidateProvider, storedOverride.model);
     if (allowedModelKeys.size === 0 || allowedModelKeys.has(key)) {

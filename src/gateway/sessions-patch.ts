@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
-import type { ModelCatalogEntry } from "../agents/model-catalog.js";
 import {
-  resolveAllowedModelRef,
-  resolveDefaultModelForAgent,
-  resolveSubagentConfiguredModelSelection,
-} from "../agents/model-selection.js";
+  isModelIsolationEnabled,
+  resolveIsolationAwareModelSelection,
+} from "../agents/edition-isolation.js";
+import type { ModelCatalogEntry } from "../agents/model-catalog.js";
+import { resolveAllowedModelRef } from "../agents/model-selection.js";
 import { normalizeGroupActivation } from "../auto-reply/group-activation.js";
 import {
   formatThinkingLevels,
@@ -73,10 +73,12 @@ export async function applySessionsPatchToStore(params: {
   const now = Date.now();
   const parsedAgent = parseAgentSessionKey(storeKey);
   const sessionAgentId = normalizeAgentId(parsedAgent?.agentId ?? resolveDefaultAgentId(cfg));
-  const resolvedDefault = resolveDefaultModelForAgent({ cfg, agentId: sessionAgentId });
-  const subagentModelHint = isSubagentSessionKey(storeKey)
-    ? resolveSubagentConfiguredModelSelection({ cfg, agentId: sessionAgentId })
-    : undefined;
+  const isolationEnabled = isModelIsolationEnabled(cfg);
+  const resolvedDefault = resolveIsolationAwareModelSelection({
+    cfg,
+    sessionKey: storeKey,
+    agentId: sessionAgentId,
+  });
 
   const existing = store[storeKey];
   const next: SessionEntry = existing
@@ -158,8 +160,12 @@ export async function applySessionsPatchToStore(params: {
     } else if (raw !== undefined) {
       const normalized = normalizeThinkLevel(String(raw));
       if (!normalized) {
-        const hintProvider = existing?.providerOverride?.trim() || resolvedDefault.provider;
-        const hintModel = existing?.modelOverride?.trim() || resolvedDefault.model;
+        const hintProvider = isolationEnabled
+          ? resolvedDefault.provider
+          : (existing?.providerOverride?.trim() ?? resolvedDefault.provider);
+        const hintModel = isolationEnabled
+          ? resolvedDefault.model
+          : (existing?.modelOverride?.trim() ?? resolvedDefault.model);
         return invalid(
           `invalid thinkingLevel (use ${formatThinkingLevels(hintProvider, hintModel, "|")})`,
         );
@@ -289,6 +295,11 @@ export async function applySessionsPatchToStore(params: {
         },
       });
     } else if (raw !== undefined) {
+      if (isolationEnabled) {
+        return invalid(
+          "Model switching is disabled by modelIsolation policy. Models are managed via modelIsolation config.",
+        );
+      }
       const trimmed = String(raw).trim();
       if (!trimmed) {
         return invalid("invalid model: empty");
@@ -305,7 +316,7 @@ export async function applySessionsPatchToStore(params: {
         catalog,
         raw: trimmed,
         defaultProvider: resolvedDefault.provider,
-        defaultModel: subagentModelHint ?? resolvedDefault.model,
+        defaultModel: resolvedDefault.model,
       });
       if ("error" in resolved) {
         return invalid(resolved.error);
@@ -325,8 +336,12 @@ export async function applySessionsPatchToStore(params: {
   }
 
   if (next.thinkingLevel === "xhigh") {
-    const effectiveProvider = next.providerOverride ?? resolvedDefault.provider;
-    const effectiveModel = next.modelOverride ?? resolvedDefault.model;
+    const effectiveProvider = isolationEnabled
+      ? resolvedDefault.provider
+      : (next.providerOverride ?? resolvedDefault.provider);
+    const effectiveModel = isolationEnabled
+      ? resolvedDefault.model
+      : (next.modelOverride ?? resolvedDefault.model);
     if (!supportsXHighThinking(effectiveProvider, effectiveModel)) {
       if ("thinkingLevel" in patch) {
         return invalid(`thinkingLevel "xhigh" is only supported for ${formatXHighModelHint()}`);

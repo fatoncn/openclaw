@@ -3,7 +3,11 @@ import type { OpenClawConfig } from "../config/config.js";
 import { logInfo } from "../logger.js";
 import { isCronSessionKey, isSubagentSessionKey } from "../routing/session-key.js";
 import { DEFAULT_PROVIDER } from "./defaults.js";
-import { buildModelAliasIndex, resolveModelRefFromString } from "./model-selection.js";
+import {
+  buildModelAliasIndex,
+  resolveDefaultModelForAgent,
+  resolveModelRefFromString,
+} from "./model-selection.js";
 
 export type EditionIsolationParams = {
   provider: string;
@@ -11,6 +15,18 @@ export type EditionIsolationParams = {
   /** Empty array = disable fallback, never cross-group */
   fallbacksOverride: string[];
 } | null;
+
+export type IsolationAwareModelSelection = {
+  provider: string;
+  model: string;
+  /** Present only when isolation is active. */
+  fallbacksOverride?: string[];
+  isolated: boolean;
+};
+
+export function isModelIsolationEnabled(cfg: OpenClawConfig): boolean {
+  return cfg.modelIsolation?.enabled === true;
+}
 
 /**
  * Returns model isolation params based on sessionKey and edition config.
@@ -124,4 +140,34 @@ export function resolveEditionSubagentModel(cfg: OpenClawConfig): string | undef
     `[edition-isolation] subagent-spawn model=${resolved.ref.provider}/${resolved.ref.model}`,
   ); // KOSBLING-PATCH
   return `${resolved.ref.provider}/${resolved.ref.model}`;
+}
+
+/**
+ * Resolve the effective runtime model for a session.
+ * - isolation enabled: returns isolated model + group fallbacks
+ * - isolation disabled: returns the normal per-agent default model
+ */
+export function resolveIsolationAwareModelSelection(params: {
+  cfg: OpenClawConfig;
+  sessionKey?: string | null;
+  agentId?: string;
+}): IsolationAwareModelSelection {
+  const isolated = resolveEditionIsolationParams(params.cfg, params.sessionKey, params.agentId);
+  if (isolated) {
+    return {
+      provider: isolated.provider,
+      model: isolated.model,
+      fallbacksOverride: isolated.fallbacksOverride,
+      isolated: true,
+    };
+  }
+  const defaultRef = resolveDefaultModelForAgent({
+    cfg: params.cfg,
+    agentId: params.agentId,
+  });
+  return {
+    provider: defaultRef.provider,
+    model: defaultRef.model,
+    isolated: false,
+  };
 }
