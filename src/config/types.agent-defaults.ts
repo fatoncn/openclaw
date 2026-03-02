@@ -185,6 +185,15 @@ export type AgentDefaultsConfig = {
    * idleMs: wait time before flushing when idle.
    */
   blockStreamingCoalesce?: BlockStreamingCoalesceConfig;
+  /**
+   * Block delivery policy:
+   * - block_disable: disable block delivery for non-webchat channel targets.
+   * - dm_enable: when block_disable is enabled, allow direct-message targets to keep block delivery.
+   */
+  block_deliver?: {
+    block_disable?: boolean;
+    dm_enable?: boolean;
+  };
   /** Human-like delay between block replies. */
   humanDelay?: HumanDelayConfig;
   timeoutSeconds?: number;

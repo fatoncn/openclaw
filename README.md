@@ -1,68 +1,71 @@
 # OpenClaw — Kosbling Edition
 
-基于 [OpenClaw](https://github.com/openclaw/openclaw) 的定制 fork，用于 [Kosbling AI Studio](https://kosbling.ai) 电商助手平台。
+A customized fork of [OpenClaw](https://github.com/openclaw/openclaw) for the [Kosbling AI Studio](https://kosbling.ai) e-commerce assistant platform.
 
-## 与上游的关系
+## Upstream Relationship
 
-- 上游仓库：`https://github.com/openclaw/openclaw.git`
-- 同步方式：`git merge --no-ff` 保留合并记录
-- 当前基线：`v2026.2.21`
+- Upstream repository: `https://github.com/openclaw/openclaw.git`
+- Sync strategy: `git merge --no-ff` (preserve merge history)
+- Current baseline: `v2026.2.21`
 
-## 定制改动
+## Custom Changes
 
-所有改动在源码中标记 `// KOSBLING-PATCH`。
+All custom changes are marked in source code with `// KOSBLING-PATCH`.
 
-### 功能改造
+### Feature Changes
 
-- **Model 隔离**（`src/agents/edition-isolation.ts` + 多个文件）
-  - 根级 `modelIsolation` 配置块，main/secondary 两组完全隔离
-  - `/model` 命令、cron payload、spawn 显式指定全部封死
-  - 支持 per-agent model override（必须在组 allowlist 内）
-  - 详见下方 [Model 隔离](#model-隔离) 章节
-  - 已向官方提交 [Feature Proposal](https://github.com/openclaw/openclaw/discussions/28314)
+- **Model Isolation** (`src/agents/edition-isolation.ts` + multiple files)
+  - Root-level `modelIsolation` config with fully isolated `main`/`secondary` groups
+  - Explicitly blocks `/model`, cron model payload overrides, and spawn-time model overrides
+  - Supports per-agent model override (must be in the group allowlist)
+  - See [Model Isolation](#model-isolation)
+  - Proposal submitted upstream: [Feature Proposal](https://github.com/openclaw/openclaw/discussions/28314)
 
-- **CLI Banner 品牌标识**（`src/cli/banner.ts`）
-  - ASCII art 下方 `✦ Kosbling Edition ✦`，单行 banner `[Kosbling Edition]`
+- **CLI branding in banner** (`src/cli/banner.ts`)
+  - `✦ Kosbling Edition ✦` under ASCII art
+  - Single-line banner: `[Kosbling Edition]`
 
-- **CLI `--version` 显示 git commit hash**（`src/cli/program/context.ts`）
-  - `openclaw -v` 输出格式：`2026.2.21-kosbling.4 (34ada4a)`
+- **CLI `--version` includes git commit hash** (`src/cli/program/context.ts`)
+  - `openclaw -v` output format: `2026.2.21-kosbling.4 (34ada4a)`
 
-- **更新机制禁用**（`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`）
-  - `openclaw update` 提示用 git pull 方式
-  - 启动时 update check 和 config version warning 跳过
+- **Update flow disabled** (`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`)
+  - `openclaw update` now guides users to `git pull`
+  - Startup update check and config version warning are skipped
 
-- **System Prompt 注入**（`src/agents/system-prompt.ts`）
-  - 所有 agent 的 system prompt 中包含 Kosbling Edition 说明
-  - 包括 model isolation 配置参考和定制版行为说明
+- **System prompt injection** (`src/agents/system-prompt.ts`)
+  - Adds Kosbling Edition guidance to all agent system prompts
+  - Includes model-isolation behavior and config guidance
 
-### Bug 修复
+### Bug Fixes
 
-> 标注 `[上游]` 的是官方代码的 bug，`[Kosbling]` 的是我们改造引入需要配套的修复。
+> `[Upstream]` means an issue in upstream code. `[Kosbling]` means a follow-up fix needed for our custom behavior.
 
-- **`[上游]` HTTP 529 不触发 model fallback**（`src/agents/failover-error.ts`）
-  - `resolveFailoverReasonFromError` 不识别 529（Anthropic overloaded），导致 fallback 链被跳过
-  - 修复：将 529 加入 `resolveFailoverReasonFromError`，映射为 "timeout" reason
-  - 相关上游 issue: [#28502](https://github.com/openclaw/openclaw/issues/28502), [#8112](https://github.com/openclaw/openclaw/issues/8112)
+- **`[Upstream]` HTTP 529 did not trigger model fallback** (`src/agents/failover-error.ts`)
+  - `resolveFailoverReasonFromError` did not recognize 529 (Anthropic overloaded), so fallback chains were skipped
+  - Fix: map 529 into fallback reason `"timeout"`
+  - Related issues: [#28502](https://github.com/openclaw/openclaw/issues/28502), [#8112](https://github.com/openclaw/openclaw/issues/8112)
 
-- **`[上游]` HTTP provider 错误（401/403/503 等）不触发 model fallback**（`src/agents/pi-embedded-runner/run.ts`）
-  - provider 返回 HTTP 错误时，错误以 `lastAssistant.stopReason="error"` 形式返回，被包装为 `isError=true` payload，不抛异常，`runWithModelFallback` 的 catch 永远捕获不到
-  - 修复：在 while 循环中检测 `stopReason="error"` 的 assistant 消息，用 `coerceToFailoverError` 分类后抛出 `FailoverError`
+- **`[Upstream]` HTTP provider errors (401/403/503...) did not trigger model fallback** (`src/agents/pi-embedded-runner/run.ts`)
+  - Provider HTTP failures returned as `lastAssistant.stopReason="error"`, wrapped into `isError=true` payloads, and never thrown
+  - `runWithModelFallback` catch branch could not trigger
+  - Fix: detect `stopReason="error"` in the loop and throw `FailoverError` via `coerceToFailoverError`
 
-- **`[上游]` model-fallback 日志不可见**（`src/agents/model-fallback.ts`）
-  - fallback 尝试时无任何日志输出，难以诊断
-  - 修复：添加 info-level 日志，fallback attempt 信息输出到 `gateway.log`（stdout）
+- **`[Upstream]` model fallback logs were invisible** (`src/agents/model-fallback.ts`)
+  - No visible logs during fallback attempts
+  - Fix: add info-level fallback attempt logs to `gateway.log` (stdout)
 
-- **`[Kosbling]` `fallbackConfigured` 不检查 `modelIsolation` fallbacks**（`src/agents/pi-embedded-runner/run.ts`）
-  - 上游 `fallbackConfigured` 只检查 `agents.defaults.model.fallbacks`，不检查 `modelIsolation` 配置的 fallbacks，导致所有 failover 检查被跳过
-  - 修复：扩展 `fallbackConfigured` 同时检查 `modelIsolation.enabled` + `main/secondary.fallbacks`
+- **`[Kosbling]` `fallbackConfigured` ignored `modelIsolation` fallbacks** (`src/agents/pi-embedded-runner/run.ts`)
+  - Upstream only checked `agents.defaults.model.fallbacks`
+  - In isolation mode, this caused fallback checks to be skipped
+  - Fix: extend check to include `modelIsolation.enabled` + `main/secondary.fallbacks`
 
-- **`[Kosbling]` /status 误报 fallback**（`src/auto-reply/status.ts`）
-  - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
-  - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
+- **`[Kosbling]` false fallback status in `/status`** (`src/auto-reply/status.ts`)
+  - Before first runtime model selection, isolation branch could incorrectly display fallback state
+  - Fix: add `hasRuntimeModel` guard
 
-### Model 隔离
+## Model Isolation
 
-openclaw.json 配置：
+`openclaw.json` example:
 
 ```json
 {
@@ -80,43 +83,61 @@ openclaw.json 配置：
 }
 ```
 
-行为：
+### Block Delivery Policy (new)
 
-- `enabled: false` 或不存在 → 走官方原版逻辑，零影响
-- `enabled: true` → main 组用于主 agent 对话（DM/群聊/TUI/webchat），secondary 组用于 cron/subagent
-- 两组完全隔离，fallback 不穿透，全挂则报错
-- `/model` 命令被拦截，spawn/cron 的 model 指定被拒绝并返回错误信息
+```json5
+{
+  agents: {
+    defaults: {
+      block_deliver: {
+        block_disable: true, // disable block delivery for non-webchat channel targets
+        dm_enable: true, // when block_disable is true, still allow block delivery in DMs
+      },
+    },
+  },
+}
+```
 
-### 配置迁移
+- `block_disable`: when `true`, non-`webchat` targets no longer receive block/stream chunks and only receive final replies.
+- `dm_enable`: when `true` and `block_disable=true`, direct-message chats still receive block/stream chunks.
 
-旧配置路径 `edition.modelIsolation` 和 `kosbling.modelIsolation` 会在启动时自动迁移到根级 `modelIsolation`。
+Behavior summary:
 
-## 开发规范
+- `enabled: false` or missing: upstream behavior, no impact
+- `enabled: true`: `main` group handles primary agent conversations (DM/group/TUI/webchat), `secondary` group handles cron/subagents
+- Groups are fully isolated, fallback does not cross groups, and full failure surfaces as error
+- `/model` is intercepted; spawn/cron model overrides are rejected with explicit errors
 
-### 改动记录
+### Config Migration
 
-所有改动必须同步更新本 README：
+Legacy paths `edition.modelIsolation` and `kosbling.modelIsolation` are auto-migrated to root-level `modelIsolation` at startup.
 
-- **功能改造** → 记录在「功能改造」区
-- **Bug 修复** → 记录在「Bug 修复」区
-- 如涉及上游 bug，附上相关 issue 链接
+## Development Rules
 
-### 功能改动必须同步 System Prompt
+### Change Log Discipline
 
-任何功能改动都必须考虑是否需要更新 `src/agents/system-prompt.ts` 中的 Kosbling Edition section。
+Every change must also update this README:
 
-### 代码标记
+- **Feature change** -> add under "Feature Changes"
+- **Bug fix** -> add under "Bug Fixes"
+- If it is an upstream bug, include upstream issue links
 
-所有定制改动必须加 `// KOSBLING-PATCH` 注释，便于 upstream 同步时识别冲突。
+### System Prompt Sync Required
 
-## 安装
+Any functional change must be evaluated for updates in the Kosbling Edition section of `src/agents/system-prompt.ts`.
 
-### 前置条件
+### Code Marking
+
+All custom edits must include `// KOSBLING-PATCH` comments to simplify upstream conflict resolution.
+
+## Installation
+
+### Prerequisites
 
 - Node.js 22+
 - pnpm
 
-### 首次安装（目标机器）
+### First Install (target machine)
 
 ```bash
 git clone https://github.com/kosbling-ai/openclaw.git ~/.openclaw-kosbling
@@ -124,7 +145,7 @@ cd ~/.openclaw-kosbling
 ./build-and-link.sh
 ```
 
-### 更新
+### Update
 
 ```bash
 cd ~/.openclaw-kosbling
@@ -132,40 +153,40 @@ git pull
 ./build-and-link.sh
 ```
 
-### 开发机
+### Dev machine
 
-在 fork 源码目录运行 `./build-and-link.sh` 只会构建，不会注册全局 CLI（避免与运行仓库冲突）。
+Running `./build-and-link.sh` in the fork source repo only builds and does not register global CLI links (to avoid conflicts with runtime repos).
 
-改完代码后：
+After code changes:
 
 ```bash
-./build-and-link.sh          # 仅构建，验证编译通过
-git add -A && git commit     # 提交
-git push origin main         # 推送
+./build-and-link.sh          # build only, validate compile
+git add -A && git commit     # commit
+git push origin main         # push
 ```
 
-然后在运行仓库（`~/.openclaw-kosbling`）pull + build 部署。
+Then pull and build in your runtime repo (`~/.openclaw-kosbling`) to deploy.
 
-## 版本管理
+## Versioning
 
-版本格式：`{upstream_version}-kosbling.{patch}`
+Version format: `{upstream_version}-kosbling.{patch}`
 
-例如：`2026.2.21-kosbling.3`
+Example: `2026.2.21-kosbling.3`
 
-版本号维护在仓库根目录的 `VERSION` 文件中，`build-and-link.sh` 构建时自动读取并写入 `package.json`。
+Version is maintained in root `VERSION`. `build-and-link.sh` reads it and writes into `package.json` during build.
 
-### 发版流程
+### Release Flow
 
 ```bash
-# 1. 更新 VERSION 文件
+# 1) Update VERSION
 echo "2026.2.21-kosbling.3" > VERSION
 
-# 2. 提交推送
+# 2) Commit and push
 git add -A && git commit -m "release: v2026.2.21-kosbling.3"
 git push origin main
 ```
 
-## 同步上游
+## Upstream Sync
 
 ```bash
 git fetch upstream
@@ -176,11 +197,11 @@ git merge upstream --no-ff -m "Merge upstream v2026.2.xx"
 git push origin main upstream
 ```
 
-## 分支说明
+## Branches
 
-- `main` — 主开发分支，包含所有 Kosbling Edition 定制
-- `upstream` — 跟踪上游 OpenClaw，用于同步合并
+- `main` - primary development branch with all Kosbling Edition customizations
+- `upstream` - tracks upstream OpenClaw for merge/sync operations
 
-## 许可证
+## License
 
-沿用上游 OpenClaw 许可证。
+Same license as upstream OpenClaw.

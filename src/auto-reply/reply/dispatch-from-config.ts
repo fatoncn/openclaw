@@ -1,4 +1,5 @@
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { normalizeChatType } from "../../channels/chat-type.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { loadSessionStore, resolveStorePath } from "../../config/sessions.js";
 import { logVerbose } from "../../globals.js";
@@ -11,6 +12,7 @@ import {
 } from "../../logging/diagnostic.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { maybeApplyTtsToPayload, normalizeTtsAutoMode, resolveTtsConfig } from "../../tts/tts.js";
+import { INTERNAL_MESSAGE_CHANNEL } from "../../utils/message-channel.js";
 import { getReplyFromConfig } from "../reply.js";
 import type { FinalizedMsgContext } from "../templating.js";
 import type { GetReplyOptions, ReplyPayload } from "../types.js";
@@ -23,6 +25,27 @@ const AUDIO_PLACEHOLDER_RE = /^<media:audio>(\s*\([^)]*\))?$/i;
 const AUDIO_HEADER_RE = /^\[Audio\b/i;
 
 const normalizeMediaType = (value: string): string => value.split(";")[0]?.trim().toLowerCase();
+
+type BlockDeliverSettings = {
+  blockDisable: boolean;
+  dmEnable: boolean;
+};
+
+function resolveBlockDeliverSettings(cfg: OpenClawConfig): BlockDeliverSettings {
+  const defaults = cfg.agents?.defaults as
+    | {
+        block_deliver?: {
+          block_disable?: unknown;
+          dm_enable?: unknown;
+        };
+      }
+    | undefined;
+  const raw = defaults?.block_deliver;
+  return {
+    blockDisable: raw?.block_disable === true,
+    dmEnable: raw?.dm_enable === true,
+  };
+}
 
 const isInboundAudioContext = (ctx: FinalizedMsgContext): boolean => {
   const rawTypes = [
@@ -238,6 +261,15 @@ export async function dispatchReplyFromConfig(params: {
   const currentSurface = (ctx.Surface ?? ctx.Provider)?.toLowerCase();
   const shouldRouteToOriginating =
     isRoutableChannel(originatingChannel) && originatingTo && originatingChannel !== currentSurface;
+  const effectiveReplyChannel = shouldRouteToOriginating ? originatingChannel : currentSurface;
+  const chatType = normalizeChatType(ctx.ChatType);
+  const blockDeliver = resolveBlockDeliverSettings(cfg);
+  const disableBlocksByPolicy = Boolean(
+    blockDeliver.blockDisable &&
+    effectiveReplyChannel &&
+    effectiveReplyChannel !== INTERNAL_MESSAGE_CHANNEL &&
+    !(chatType === "direct" && blockDeliver.dmEnable),
+  );
   const ttsChannel = shouldRouteToOriginating ? originatingChannel : currentSurface;
 
   /**
@@ -339,6 +371,7 @@ export async function dispatchReplyFromConfig(params: {
       ctx,
       {
         ...params.replyOptions,
+        disableBlockStreaming: params.replyOptions?.disableBlockStreaming || disableBlocksByPolicy,
         onToolResult: (payload: ReplyPayload) => {
           const run = async () => {
             const ttsPayload = await maybeApplyTtsToPayload({

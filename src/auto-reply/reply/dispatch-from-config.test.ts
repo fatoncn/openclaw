@@ -538,4 +538,87 @@ describe("dispatchReplyFromConfig", () => {
       }),
     );
   });
+
+  it("disables block delivery for non-webchat targets when block_deliver.block_disable is enabled", async () => {
+    setNoAbort();
+    const dispatcher = createDispatcher();
+    const ctx = buildTestCtx({
+      Provider: "discord",
+      Surface: "discord",
+      ChatType: "channel",
+      From: "discord:channel:1",
+      To: "discord:channel:1",
+    });
+    const cfg = {
+      agents: {
+        defaults: {
+          block_deliver: {
+            block_disable: true,
+          },
+        },
+      },
+    } as OpenClawConfig;
+    let disableBlockStreamingValue: boolean | undefined;
+    const replyResolver = async (
+      _ctx: MsgContext,
+      opts?: GetReplyOptions,
+    ): Promise<ReplyPayload> => {
+      disableBlockStreamingValue = opts?.disableBlockStreaming;
+      if (!opts?.disableBlockStreaming) {
+        await opts?.onBlockReply?.({ text: "streamed block" });
+      }
+      return { text: "final reply" };
+    };
+
+    await dispatchReplyFromConfig({ ctx, cfg, dispatcher, replyResolver });
+
+    expect(disableBlockStreamingValue).toBe(true);
+    expect(dispatcher.sendBlockReply).not.toHaveBeenCalled();
+    expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "final reply" }),
+    );
+  });
+
+  it("keeps DM block delivery when block_deliver.dm_enable is enabled", async () => {
+    setNoAbort();
+    const dispatcher = createDispatcher();
+    const ctx = buildTestCtx({
+      Provider: "telegram",
+      Surface: "telegram",
+      ChatType: "direct",
+      From: "telegram:123",
+      To: "telegram:123",
+    });
+    const cfg = {
+      agents: {
+        defaults: {
+          block_deliver: {
+            block_disable: true,
+            dm_enable: true,
+          },
+        },
+      },
+    } as OpenClawConfig;
+    let disableBlockStreamingValue: boolean | undefined;
+    const replyResolver = async (
+      _ctx: MsgContext,
+      opts?: GetReplyOptions,
+    ): Promise<ReplyPayload> => {
+      disableBlockStreamingValue = opts?.disableBlockStreaming;
+      if (!opts?.disableBlockStreaming) {
+        await opts?.onBlockReply?.({ text: "dm block" });
+      }
+      return { text: "dm final" };
+    };
+
+    await dispatchReplyFromConfig({ ctx, cfg, dispatcher, replyResolver });
+
+    expect(disableBlockStreamingValue).toBe(false);
+    expect(dispatcher.sendBlockReply).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "dm block" }),
+    );
+    expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
+      expect.objectContaining({ text: "dm final" }),
+    );
+  });
 });
