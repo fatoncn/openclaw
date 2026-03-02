@@ -63,6 +63,11 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Before first runtime model selection, isolation branch could incorrectly display fallback state
   - Fix: add `hasRuntimeModel` guard
 
+- **`[Kosbling]` gateway restart could fork orphan process under launchd** (`src/infra/process-respawn.ts`)
+  - During SIGUSR1 restart, supervised-environment detection could miss launchd context and take detached spawn path
+  - This left an orphan `openclaw-gateway` process holding port `18789`, while LaunchAgent kept retrying and logging `gateway already running`
+  - Fix: treat `XPC_SERVICE_NAME`, `OPENCLAW_LAUNCHD_LABEL`, and `OPENCLAW_SYSTEMD_UNIT` as supervisor hints; restart now returns `supervised` in these contexts
+
 ## Model Isolation
 
 `openclaw.json` example:

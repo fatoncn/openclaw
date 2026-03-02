@@ -60,6 +60,11 @@
   - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
   - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
 
+- **`[Kosbling]` launchd 下 gateway 重启可能派生孤儿进程**（`src/infra/process-respawn.ts`）
+  - `SIGUSR1` 重启时，受管环境识别可能漏判 launchd，上了 detached spawn 分支
+  - 会遗留一个占用 `18789` 的孤儿 `openclaw-gateway`，同时 LaunchAgent 持续重试并刷出 `gateway already running` 日志
+  - 修复：将 `XPC_SERVICE_NAME`、`OPENCLAW_LAUNCHD_LABEL`、`OPENCLAW_SYSTEMD_UNIT` 纳入 supervisor 判定，命中后走 `supervised` 重启路径
+
 ### Model 隔离
 
 `openclaw.json` 配置：
