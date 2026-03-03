@@ -391,22 +391,22 @@ function ensureListener() {
         }
         return;
       }
-      if (phase !== "end" && phase !== "error") {
+      if (phase !== "end") {
+        // A single runId can emit intermediate lifecycle:error events while the
+        // fallback chain is still in progress. Treating those as terminal causes
+        // premature subagent completion announcements. Final error completion is
+        // resolved by agent.wait (started in registerSubagentRun).
         return;
       }
       const endedAt = typeof evt.data?.endedAt === "number" ? evt.data.endedAt : Date.now();
-      const error = typeof evt.data?.error === "string" ? evt.data.error : undefined;
-      const outcome: SubagentRunOutcome =
-        phase === "error"
-          ? { status: "error", error }
-          : evt.data?.aborted
-            ? { status: "timeout" }
-            : { status: "ok" };
+      const outcome: SubagentRunOutcome = evt.data?.aborted
+        ? { status: "timeout" }
+        : { status: "ok" };
       await completeSubagentRun({
         runId: evt.runId,
         endedAt,
         outcome,
-        reason: phase === "error" ? SUBAGENT_ENDED_REASON_ERROR : SUBAGENT_ENDED_REASON_COMPLETE,
+        reason: SUBAGENT_ENDED_REASON_COMPLETE,
         sendFarewell: true,
         accountId: entry.requesterOrigin?.accountId,
         triggerCleanup: true,

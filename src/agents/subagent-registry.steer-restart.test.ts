@@ -134,6 +134,62 @@ describe("subagent registry steer restarts", () => {
     expect(announce.childRunId).toBe("run-new");
   });
 
+  it("ignores intermediate lifecycle errors and waits for terminal end before announce", async () => {
+    const callGateway = vi.mocked((await import("../gateway/call.js")).callGateway);
+    const originalCallGateway = callGateway.getMockImplementation();
+    callGateway.mockImplementation(async (request: unknown) => {
+      const typed = request as { method?: string };
+      if (typed.method === "agent.wait") {
+        return new Promise<unknown>(() => undefined);
+      }
+      if (originalCallGateway) {
+        return originalCallGateway(request as Parameters<typeof callGateway>[0]);
+      }
+      return {};
+    });
+
+    try {
+      mod.registerSubagentRun({
+        runId: "run-fallback-in-flight",
+        childSessionKey: "agent:main:subagent:fallback-in-flight",
+        requesterSessionKey: "agent:main:main",
+        requesterDisplayKey: "main",
+        task: "fallback test",
+        cleanup: "keep",
+      });
+
+      lifecycleHandler?.({
+        stream: "lifecycle",
+        runId: "run-fallback-in-flight",
+        data: { phase: "error", error: "primary model failed" },
+      });
+      await flushAnnounce();
+      expect(announceSpy).not.toHaveBeenCalled();
+      expect(runSubagentEndedHookMock).not.toHaveBeenCalled();
+
+      lifecycleHandler?.({
+        stream: "lifecycle",
+        runId: "run-fallback-in-flight",
+        data: { phase: "end" },
+      });
+      await flushAnnounce();
+      expect(announceSpy).toHaveBeenCalledTimes(1);
+      expect(runSubagentEndedHookMock).toHaveBeenCalledTimes(1);
+      expect(runSubagentEndedHookMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runId: "run-fallback-in-flight",
+        }),
+        expect.objectContaining({
+          runId: "run-fallback-in-flight",
+        }),
+      );
+    } finally {
+      if (originalCallGateway) {
+        callGateway.mockImplementation(originalCallGateway);
+      }
+    }
+  });
+
   it("defers subagent_ended hook for completion-mode runs until announce delivery resolves", async () => {
     const callGateway = vi.mocked((await import("../gateway/call.js")).callGateway);
     const originalCallGateway = callGateway.getMockImplementation();
