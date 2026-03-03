@@ -492,6 +492,15 @@ export type ToolsConfig = {
       userAgent?: string;
       /** Use Readability to extract main content (default: true). */
       readability?: boolean;
+      /** SSRF policy for web_fetch network targets. */
+      ssrfPolicy?: {
+        /** Allow private/internal IP ranges (default: false). */
+        allowPrivateNetwork?: boolean;
+        /** Explicit hostnames allowed even if they resolve to private ranges. */
+        allowedHostnames?: string[];
+        /** Optional hostname allowlist patterns (exact or *.suffix). */
+        hostnameAllowlist?: string[];
+      };
       firecrawl?: {
         /** Enable Firecrawl fallback (default: true when apiKey is set). */
         enabled?: boolean;

@@ -3,7 +3,7 @@ import * as ssrf from "../../infra/net/ssrf.js";
 import { type FetchMock, withFetchPreconnect } from "../../test-utils/fetch-mock.js";
 
 const lookupMock = vi.fn();
-const resolvePinnedHostname = ssrf.resolvePinnedHostname;
+const resolvePinnedHostnameWithPolicy = ssrf.resolvePinnedHostnameWithPolicy;
 
 function makeHeaders(map: Record<string, string>): { get: (key: string) => string | null } {
   return {
@@ -39,6 +39,11 @@ function setMockFetch(
 
 async function createWebFetchToolForTest(params?: {
   firecrawl?: { enabled?: boolean; apiKey?: string };
+  ssrfPolicy?: {
+    allowPrivateNetwork?: boolean;
+    allowedHostnames?: string[];
+    hostnameAllowlist?: string[];
+  };
 }) {
   const { createWebFetchTool } = await import("./web-tools.js");
   return createWebFetchTool({
@@ -48,6 +53,7 @@ async function createWebFetchToolForTest(params?: {
           fetch: {
             cacheTtlMinutes: 0,
             firecrawl: params?.firecrawl ?? { enabled: false },
+            ...(params?.ssrfPolicy ? { ssrfPolicy: params.ssrfPolicy } : {}),
           },
         },
       },
@@ -67,8 +73,8 @@ describe("web_fetch SSRF protection", () => {
   const priorFetch = global.fetch;
 
   beforeEach(() => {
-    vi.spyOn(ssrf, "resolvePinnedHostname").mockImplementation((hostname) =>
-      resolvePinnedHostname(hostname, lookupMock),
+    vi.spyOn(ssrf, "resolvePinnedHostnameWithPolicy").mockImplementation((hostname, params = {}) =>
+      resolvePinnedHostnameWithPolicy(hostname, { ...params, lookupFn: lookupMock }),
     );
   });
 
@@ -137,6 +143,21 @@ describe("web_fetch SSRF protection", () => {
     const tool = await createWebFetchToolForTest();
 
     const result = await tool?.execute?.("call", { url: "https://example.com" });
+    expect(result?.details).toMatchObject({
+      status: 200,
+      extractor: "raw",
+    });
+  });
+
+  it("allows private IPs when ssrfPolicy.allowPrivateNetwork is enabled", async () => {
+    lookupMock.mockResolvedValue([{ address: "198.18.0.1", family: 4 }]);
+
+    setMockFetch().mockResolvedValue(textResponse("ok"));
+    const tool = await createWebFetchToolForTest({
+      ssrfPolicy: { allowPrivateNetwork: true },
+    });
+
+    const result = await tool?.execute?.("call", { url: "http://198.18.0.1/test" });
     expect(result?.details).toMatchObject({
       status: 200,
       extractor: "raw",

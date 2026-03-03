@@ -1,7 +1,7 @@
 import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import { fetchWithSsrFGuard } from "../../infra/net/fetch-guard.js";
-import { SsrFBlockedError } from "../../infra/net/ssrf.js";
+import { SsrFBlockedError, type SsrFPolicy } from "../../infra/net/ssrf.js";
 import { logDebug } from "../../logger.js";
 import { wrapExternalContent, wrapWebContent } from "../../security/external-content.js";
 import { normalizeSecretInput } from "../../utils/normalize-secret-input.js";
@@ -99,6 +99,32 @@ function resolveFetchReadabilityEnabled(fetch?: WebFetchConfig): boolean {
     return fetch.readability;
   }
   return true;
+}
+
+function normalizeStringList(values: string[] | undefined): string[] | undefined {
+  if (!Array.isArray(values) || values.length === 0) {
+    return undefined;
+  }
+  const normalized = values.map((value) => value.trim()).filter((value) => value.length > 0);
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function resolveFetchSsrFPolicy(fetch?: WebFetchConfig): SsrFPolicy | undefined {
+  const allowPrivateNetwork = fetch?.ssrfPolicy?.allowPrivateNetwork;
+  const allowedHostnames = normalizeStringList(fetch?.ssrfPolicy?.allowedHostnames);
+  const hostnameAllowlist = normalizeStringList(fetch?.ssrfPolicy?.hostnameAllowlist);
+  if (
+    allowPrivateNetwork === undefined &&
+    allowedHostnames === undefined &&
+    hostnameAllowlist === undefined
+  ) {
+    return undefined;
+  }
+  return {
+    ...(allowPrivateNetwork === true ? { allowPrivateNetwork: true } : {}),
+    ...(allowedHostnames ? { allowedHostnames } : {}),
+    ...(hostnameAllowlist ? { hostnameAllowlist } : {}),
+  };
 }
 
 function resolveFetchMaxCharsCap(fetch?: WebFetchConfig): number {
@@ -446,6 +472,7 @@ type WebFetchRuntimeParams = FirecrawlRuntimeParams & {
   cacheTtlMs: number;
   userAgent: string;
   readabilityEnabled: boolean;
+  ssrfPolicy?: SsrFPolicy;
 };
 
 function toFirecrawlContentParams(
@@ -527,6 +554,7 @@ async function runWebFetch(params: WebFetchRuntimeParams): Promise<Record<string
       url: params.url,
       maxRedirects: params.maxRedirects,
       timeoutMs: params.timeoutSeconds * 1000,
+      policy: params.ssrfPolicy,
       init: {
         headers: {
           Accept: "text/markdown, text/html;q=0.9, */*;q=0.1",
@@ -732,6 +760,7 @@ export function createWebFetchTool(options?: {
     (fetch && "userAgent" in fetch && typeof fetch.userAgent === "string" && fetch.userAgent) ||
     DEFAULT_FETCH_USER_AGENT;
   const maxResponseBytes = resolveFetchMaxResponseBytes(fetch);
+  const ssrfPolicy = resolveFetchSsrFPolicy(fetch);
   return {
     label: "Web Fetch",
     name: "web_fetch",
@@ -766,6 +795,7 @@ export function createWebFetchTool(options?: {
         firecrawlProxy: "auto",
         firecrawlStoreInCache: true,
         firecrawlTimeoutSeconds,
+        ssrfPolicy,
       });
       return jsonResult(result);
     },
