@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import type { ThinkLevel } from "../../auto-reply/thinking.js";
+import { resolveAgentModelFallbackValues } from "../../config/model-input.js";
 import { generateSecureToken } from "../../infra/secure-random.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import type { PluginHookBeforeAgentStartResult } from "../../plugins/types.js";
@@ -237,7 +238,7 @@ export async function runEmbeddedPiAgent(
       const agentDir = params.agentDir ?? resolveOpenClawAgentDir();
       // KOSBLING-PATCH: include Kosbling modelIsolation fallbacks in failover gate.
       const fallbackConfigured =
-        (params.config?.agents?.defaults?.model?.fallbacks?.length ?? 0) > 0 ||
+        resolveAgentModelFallbackValues(params.config?.agents?.defaults?.model).length > 0 ||
         (params.config?.modelIsolation?.enabled === true &&
           ((params.config?.modelIsolation?.main?.fallbacks?.length ?? 0) > 0 ||
             (params.config?.modelIsolation?.secondary?.fallbacks?.length ?? 0) > 0));
@@ -524,6 +525,8 @@ export async function runEmbeddedPiAgent(
       const maybeMarkAuthProfileFailure = async (failure: {
         profileId?: string;
         reason?: Parameters<typeof markAuthProfileFailure>[0]["reason"] | null;
+        config?: RunEmbeddedPiAgentParams["config"];
+        agentDir?: RunEmbeddedPiAgentParams["agentDir"];
       }) => {
         const { profileId, reason } = failure;
         if (!profileId || !reason || reason === "timeout") {
@@ -590,6 +593,7 @@ export async function runEmbeddedPiAgent(
             senderIsOwner: params.senderIsOwner,
             currentChannelId: params.currentChannelId,
             currentThreadTs: params.currentThreadTs,
+            currentMessageId: params.currentMessageId,
             replyToMode: params.replyToMode,
             hasRepliedRef: params.hasRepliedRef,
             sessionFile: params.sessionFile,
