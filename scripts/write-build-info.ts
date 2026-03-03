@@ -6,6 +6,21 @@ import { fileURLToPath } from "node:url";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const distDir = path.join(rootDir, "dist");
 const pkgPath = path.join(rootDir, "package.json");
+const versionFilePath = path.join(rootDir, "VERSION");
+
+const readVersionFromEnv = () => {
+  const value = process.env.OPENCLAW_VERSION?.trim();
+  return value || null;
+};
+
+const readVersionFromVersionFile = () => {
+  try {
+    const raw = fs.readFileSync(versionFilePath, "utf8").trim();
+    return raw || null;
+  } catch {
+    return null;
+  }
+};
 
 const readPackageVersion = () => {
   try {
@@ -34,7 +49,7 @@ const resolveCommit = () => {
   }
 };
 
-const version = readPackageVersion();
+const version = readVersionFromEnv() || readVersionFromVersionFile() || readPackageVersion();
 const commit = resolveCommit();
 
 const buildInfo = {

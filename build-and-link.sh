@@ -15,13 +15,19 @@ set -e
 
 cd "$(dirname "$0")"
 
-# 从 VERSION 文件读取版本号注入 package.json
+# 读取版本并做一致性检查（不再修改 package.json，避免工作区脏改动）
 if [ -f "VERSION" ]; then
-  APP_VERSION=$(cat VERSION | tr -d '[:space:]')
-  echo "📌 Version: $APP_VERSION"
-  node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); p.version='$APP_VERSION'; fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
+  APP_VERSION=$(tr -d '[:space:]' < VERSION)
+  PKG_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "")
+  echo "📌 Version (VERSION): ${APP_VERSION}"
+  echo "📌 Version (package.json): ${PKG_VERSION:-unknown}"
+  if [ -n "$PKG_VERSION" ] && [ "$APP_VERSION" != "$PKG_VERSION" ]; then
+    echo "⚠️  VERSION and package.json version differ."
+    echo "   Build output will use VERSION (via scripts/write-build-info.ts)."
+    echo "   Keep package.json aligned only when you need release metadata consistency."
+  fi
 else
-  echo "⚠️  VERSION file not found, using package.json version as-is"
+  echo "⚠️  VERSION file not found"
 fi
 
 echo "📦 Installing dependencies..."
