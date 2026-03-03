@@ -10,7 +10,10 @@ import { getCliSessionId, setCliSessionId } from "../../agents/cli-session.js";
 import { lookupContextTokens } from "../../agents/context.js";
 import { resolveCronStyleNow } from "../../agents/current-time.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../../agents/defaults.js";
-import { resolveEditionIsolationParams } from "../../agents/edition-isolation.js"; // KOSBLING-PATCH
+import {
+  normalizeIsolationModelRef,
+  resolveEditionIsolationParams,
+} from "../../agents/edition-isolation.js"; // KOSBLING-PATCH
 import { loadModelCatalog } from "../../agents/model-catalog.js";
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import {
@@ -238,7 +241,7 @@ export async function runCronIsolatedAgentTurn(params: {
       catalog: await loadCatalog(),
       ref: hooksGmailModelRef,
       defaultProvider: resolvedDefault.provider,
-      defaultModel: resolvedDefault.model,
+      defaultModel: `${resolvedDefault.provider}/${resolvedDefault.model}`,
     });
     if (status.allowed) {
       provider = hooksGmailModelRef.provider;
@@ -249,30 +252,59 @@ export async function runCronIsolatedAgentTurn(params: {
   const modelOverrideRaw =
     params.job.payload.kind === "agentTurn" ? params.job.payload.model : undefined;
   let modelOverride = typeof modelOverrideRaw === "string" ? modelOverrideRaw.trim() : undefined;
-  // KOSBLING-PATCH: when edition isolation is active, ignore cron payload model override
-  if (
-    modelOverride !== undefined &&
-    modelOverride.length > 0 &&
-    resolveEditionIsolationParams(params.cfg, agentSessionKey, agentId) // KOSBLING-PATCH
-  ) {
-    logWarn(
-      `[cron:${params.job.id}] Cron model override "${modelOverride}" ignored: model isolation enforces secondary model group.`,
-    );
-    modelOverride = undefined; // KOSBLING-PATCH: actually ignore the override
-  }
   if (modelOverride !== undefined && modelOverride.length > 0) {
-    const resolvedOverride = resolveAllowedModelRef({
-      cfg: cfgWithAgentDefaults,
-      catalog: await loadCatalog(),
+    const normalized = normalizeIsolationModelRef({
+      cfg: params.cfg,
+      sessionKey: agentSessionKey,
       raw: modelOverride,
-      defaultProvider: resolvedDefault.provider,
-      defaultModel: resolvedDefault.model,
+      agentId,
     });
-    if ("error" in resolvedOverride) {
-      return { status: "error", error: resolvedOverride.error };
+    if (normalized && !normalized.ok) {
+      return { status: "error", error: normalized.error };
     }
-    provider = resolvedOverride.ref.provider;
-    model = resolvedOverride.ref.model;
+    if (normalized && normalized.ok) {
+      provider = normalized.provider;
+      model = normalized.model;
+      if (normalized.rewritten) {
+        logWarn(
+          `[cron:${params.job.id}] model override normalized by isolation policy: ${normalized.requestedProvider}/${normalized.requestedModel} -> ${normalized.provider}/${normalized.model} (group=${normalized.group})`,
+        );
+      }
+    } else {
+      const resolvedOverride = resolveAllowedModelRef({
+        cfg: cfgWithAgentDefaults,
+        catalog: await loadCatalog(),
+        raw: modelOverride,
+        defaultProvider: resolvedDefault.provider,
+        defaultModel: `${resolvedDefault.provider}/${resolvedDefault.model}`,
+      });
+      if ("error" in resolvedOverride) {
+        return { status: "error", error: resolvedOverride.error };
+      }
+      provider = resolvedOverride.ref.provider;
+      model = resolvedOverride.ref.model;
+    }
+  }
+  const finalNormalized = normalizeIsolationModelRef({
+    cfg: params.cfg,
+    sessionKey: agentSessionKey,
+    raw: `${provider}/${model}`,
+    agentId,
+  });
+  if (finalNormalized && !finalNormalized.ok) {
+    return { status: "error", error: finalNormalized.error };
+  }
+  if (finalNormalized && finalNormalized.ok) {
+    if (
+      finalNormalized.rewritten &&
+      `${provider}/${model}` !== `${finalNormalized.provider}/${finalNormalized.model}`
+    ) {
+      logWarn(
+        `[cron:${params.job.id}] selected model normalized by isolation policy: ${provider}/${model} -> ${finalNormalized.provider}/${finalNormalized.model} (group=${finalNormalized.group})`,
+      );
+    }
+    provider = finalNormalized.provider;
+    model = finalNormalized.model;
   }
   const now = Date.now();
   const cronSession = resolveCronSession({
@@ -459,12 +491,12 @@ export async function runCronIsolatedAgentTurn(params: {
       verboseLevel: resolvedVerboseLevel,
     });
     const messageChannel = resolvedDelivery.channel;
-    // KOSBLING-PATCH: model isolation — if kosblingParams present, always use it, never fall back to payload/session provider
+    // KOSBLING-PATCH: enforce isolated fallbacks while keeping normalized model selection.
     const kosblingParams = resolveEditionIsolationParams(params.cfg, agentSessionKey, agentId); // KOSBLING-PATCH
     const fallbackResult = await runWithModelFallback({
       cfg: cfgWithAgentDefaults,
-      provider: kosblingParams ? kosblingParams.provider : provider,
-      model: kosblingParams ? kosblingParams.model : model,
+      provider,
+      model,
       agentDir,
       fallbacksOverride: kosblingParams
         ? kosblingParams.fallbacksOverride

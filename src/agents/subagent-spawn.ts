@@ -261,15 +261,8 @@ export async function spawnSubagentDirect(
   const childDepth = callerDepth + 1;
   const spawnedByKey = requesterInternalKey;
   const targetAgentConfig = resolveAgentConfig(cfg, targetAgentId);
-  // KOSBLING-PATCH: if isolation enabled, reject explicit modelOverride from caller
+  // KOSBLING-PATCH: isolation mode may normalize the requested model later in sessions.patch.
   const kosblingSecondaryModel = resolveEditionSubagentModel(cfg);
-  if (kosblingSecondaryModel !== undefined && modelOverride) {
-    return {
-      status: "error",
-      error:
-        "Model override rejected: Kosbling model isolation policy enforces secondary model group. Remove the model parameter from spawn.",
-    };
-  }
   const resolvedModel = resolveSubagentSpawnModelSelection({
     cfg,
     agentId: targetAgentId,

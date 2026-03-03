@@ -3,7 +3,7 @@ import {
   resolveAgentDir,
   resolveSessionAgentId,
 } from "../../agents/agent-scope.js";
-import { resolveEditionIsolationParams } from "../../agents/edition-isolation.js"; // KOSBLING-PATCH
+import { normalizeIsolationModelRef } from "../../agents/edition-isolation.js"; // KOSBLING-PATCH
 import { resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import { type SessionEntry, updateSessionStore } from "../../config/sessions.js";
@@ -94,17 +94,6 @@ export async function handleDirectiveOnly(
   }).sandboxed;
   const shouldHintDirectRuntime = directives.hasElevatedDirective && !runtimeIsSandboxed;
 
-  // KOSBLING-PATCH: block /model switching when isolation is enabled
-  if (
-    params.directives.hasModelDirective &&
-    params.directives.rawModelDirective?.trim() &&
-    resolveEditionIsolationParams(params.cfg, params.sessionKey)
-  ) {
-    return {
-      text: "Model switching is disabled by Kosbling model isolation policy. Models are managed via modelIsolation config.",
-    };
-  }
-
   const modelInfo = await maybeHandleModelDirectiveInfo({
     directives,
     cfg: params.cfg,
@@ -138,8 +127,31 @@ export async function handleDirectiveOnly(
   if (modelResolution.errorText) {
     return { text: modelResolution.errorText };
   }
-  const modelSelection = modelResolution.modelSelection;
+  let modelSelection = modelResolution.modelSelection;
   const profileOverride = modelResolution.profileOverride;
+  let isolationModelRewriteNotice: string | undefined;
+  if (modelSelection) {
+    const normalized = normalizeIsolationModelRef({
+      cfg: params.cfg,
+      sessionKey,
+      raw: `${modelSelection.provider}/${modelSelection.model}`,
+      agentId: activeAgentId,
+    });
+    if (normalized && !normalized.ok) {
+      return { text: normalized.error };
+    }
+    if (normalized && normalized.ok) {
+      modelSelection = {
+        ...modelSelection,
+        provider: normalized.provider,
+        model: normalized.model,
+        isDefault: normalized.provider === defaultProvider && normalized.model === defaultModel,
+      };
+      if (normalized.rewritten) {
+        isolationModelRewriteNotice = `Model normalized by isolation policy: ${normalized.requestedProvider}/${normalized.requestedModel} -> ${normalized.provider}/${normalized.model}.`;
+      }
+    }
+  }
 
   const resolvedProvider = modelSelection?.provider ?? provider;
   const resolvedModel = modelSelection?.model ?? model;
@@ -452,6 +464,9 @@ export async function handleDirectiveOnly(
         ? `Model reset to default (${labelWithAlias}).`
         : `Model set to ${labelWithAlias}.`,
     );
+    if (isolationModelRewriteNotice) {
+      parts.push(isolationModelRewriteNotice);
+    }
     if (profileOverride) {
       parts.push(`Auth profile set to ${profileOverride}.`);
     }

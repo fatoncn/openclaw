@@ -24,6 +24,21 @@ export type IsolationAwareModelSelection = {
   isolated: boolean;
 };
 
+export type IsolationModelNormalizationResult =
+  | {
+      ok: true;
+      provider: string;
+      model: string;
+      requestedProvider: string;
+      requestedModel: string;
+      rewritten: boolean;
+      group: "main" | "secondary";
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 export function isModelIsolationEnabled(cfg: OpenClawConfig): boolean {
   return cfg.modelIsolation?.enabled === true;
 }
@@ -169,5 +184,97 @@ export function resolveIsolationAwareModelSelection(params: {
     provider: defaultRef.provider,
     model: defaultRef.model,
     isolated: false,
+  };
+}
+
+/**
+ * Normalize a requested model ref to the active isolation group.
+ * - Group-in model: accepted as requested.
+ * - Group-out model: rewritten to the group's effective default model.
+ */
+export function normalizeIsolationModelRef(params: {
+  cfg: OpenClawConfig;
+  sessionKey?: string | null;
+  raw: string;
+  agentId?: string;
+}): IsolationModelNormalizationResult | null {
+  if (!isModelIsolationEnabled(params.cfg)) {
+    return null;
+  }
+
+  const isolation = params.cfg.modelIsolation;
+  if (!isolation) {
+    return null;
+  }
+  const group: "main" | "secondary" =
+    isCronSessionKey(params.sessionKey) || isSubagentSessionKey(params.sessionKey)
+      ? "secondary"
+      : "main";
+  const groupCfg = group === "secondary" ? isolation.secondary : isolation.main;
+  if (!groupCfg?.model) {
+    return null;
+  }
+
+  const effectiveDefault = resolveIsolationAwareModelSelection({
+    cfg: params.cfg,
+    sessionKey: params.sessionKey,
+    agentId: params.agentId,
+  });
+  const aliasIndex = buildModelAliasIndex({ cfg: params.cfg, defaultProvider: DEFAULT_PROVIDER });
+
+  const requested = resolveModelRefFromString({
+    raw: params.raw,
+    defaultProvider: effectiveDefault.provider,
+    aliasIndex,
+  });
+  if (!requested) {
+    return {
+      ok: false,
+      error: `invalid model: ${params.raw.trim()}`,
+    };
+  }
+
+  const allowlist = new Set<string>();
+  const primary = resolveModelRefFromString({
+    raw: groupCfg.model,
+    defaultProvider: DEFAULT_PROVIDER,
+    aliasIndex,
+  });
+  if (primary) {
+    allowlist.add(`${primary.ref.provider}/${primary.ref.model}`);
+  }
+  for (const fallback of groupCfg.fallbacks ?? []) {
+    const resolved = resolveModelRefFromString({
+      raw: fallback,
+      defaultProvider: DEFAULT_PROVIDER,
+      aliasIndex,
+    });
+    if (resolved) {
+      allowlist.add(`${resolved.ref.provider}/${resolved.ref.model}`);
+    }
+  }
+
+  // Ensure effective default is always considered group-allowed.
+  allowlist.add(`${effectiveDefault.provider}/${effectiveDefault.model}`);
+  const requestedKey = `${requested.ref.provider}/${requested.ref.model}`;
+  if (!allowlist.has(requestedKey)) {
+    return {
+      ok: true,
+      provider: effectiveDefault.provider,
+      model: effectiveDefault.model,
+      requestedProvider: requested.ref.provider,
+      requestedModel: requested.ref.model,
+      rewritten: true,
+      group,
+    };
+  }
+  return {
+    ok: true,
+    provider: requested.ref.provider,
+    model: requested.ref.model,
+    requestedProvider: requested.ref.provider,
+    requestedModel: requested.ref.model,
+    rewritten: false,
+    group,
   };
 }

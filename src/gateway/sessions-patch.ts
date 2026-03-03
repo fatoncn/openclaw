@@ -2,10 +2,14 @@ import { randomUUID } from "node:crypto";
 import { resolveDefaultAgentId } from "../agents/agent-scope.js";
 import {
   isModelIsolationEnabled,
+  normalizeIsolationModelRef,
   resolveIsolationAwareModelSelection,
 } from "../agents/edition-isolation.js";
 import type { ModelCatalogEntry } from "../agents/model-catalog.js";
-import { resolveAllowedModelRef } from "../agents/model-selection.js";
+import {
+  resolveAllowedModelRef,
+  resolveSubagentConfiguredModelSelection,
+} from "../agents/model-selection.js";
 import { normalizeGroupActivation } from "../auto-reply/group-activation.js";
 import {
   formatThinkingLevels,
@@ -18,6 +22,7 @@ import {
 } from "../auto-reply/thinking.js";
 import type { OpenClawConfig } from "../config/config.js";
 import type { SessionEntry } from "../config/sessions.js";
+import { logWarn } from "../logger.js";
 import {
   isSubagentSessionKey,
   normalizeAgentId,
@@ -79,6 +84,30 @@ export async function applySessionsPatchToStore(params: {
     sessionKey: storeKey,
     agentId: sessionAgentId,
   });
+  const resolveSubagentConfiguredModelRaw = (): string | undefined => {
+    if (!isSubagentSessionKey(storeKey)) {
+      return undefined;
+    }
+    return resolveSubagentConfiguredModelSelection({
+      cfg,
+      agentId: sessionAgentId,
+    });
+  };
+  const isRawSubagentConfiguredModel = (raw: string): boolean => {
+    const configuredRaw = resolveSubagentConfiguredModelRaw();
+    if (!configuredRaw) {
+      return false;
+    }
+    return configuredRaw.trim().toLowerCase() === raw.trim().toLowerCase();
+  };
+  const parseProviderModelLiteral = (raw: string): { provider: string; model: string } | null => {
+    const trimmed = raw.trim();
+    const idx = trimmed.indexOf("/");
+    if (idx <= 0 || idx >= trimmed.length - 1) {
+      return null;
+    }
+    return { provider: trimmed.slice(0, idx), model: trimmed.slice(idx + 1) };
+  };
 
   const existing = store[storeKey];
   const next: SessionEntry = existing
@@ -295,40 +324,102 @@ export async function applySessionsPatchToStore(params: {
         },
       });
     } else if (raw !== undefined) {
-      if (isolationEnabled) {
-        return invalid(
-          "Model switching is disabled by modelIsolation policy. Models are managed via modelIsolation config.",
-        );
-      }
       const trimmed = String(raw).trim();
       if (!trimmed) {
         return invalid("invalid model: empty");
       }
-      if (!params.loadGatewayModelCatalog) {
-        return {
-          ok: false,
-          error: errorShape(ErrorCodes.UNAVAILABLE, "model catalog unavailable"),
-        };
+
+      let nextProvider: string;
+      let nextModel: string;
+      if (isolationEnabled) {
+        const normalized = normalizeIsolationModelRef({
+          cfg,
+          sessionKey: storeKey,
+          raw: trimmed,
+          agentId: sessionAgentId,
+        });
+        if (normalized && !normalized.ok) {
+          return invalid(normalized.error);
+        }
+        if (normalized && normalized.ok) {
+          nextProvider = normalized.provider;
+          nextModel = normalized.model;
+          if (normalized.rewritten) {
+            logWarn(
+              `[sessions.patch] isolation normalized model ${normalized.requestedProvider}/${normalized.requestedModel} -> ${normalized.provider}/${normalized.model} for key=${storeKey} group=${normalized.group}`,
+            );
+          }
+        } else {
+          // Isolation enabled but not fully configured: keep standard model resolution.
+          if (!params.loadGatewayModelCatalog) {
+            return {
+              ok: false,
+              error: errorShape(ErrorCodes.UNAVAILABLE, "model catalog unavailable"),
+            };
+          }
+          const catalog = await params.loadGatewayModelCatalog();
+          const resolved = resolveAllowedModelRef({
+            cfg,
+            catalog,
+            raw: trimmed,
+            defaultProvider: resolvedDefault.provider,
+            defaultModel: `${resolvedDefault.provider}/${resolvedDefault.model}`,
+          });
+          if ("error" in resolved) {
+            if (isRawSubagentConfiguredModel(trimmed)) {
+              const parsed = parseProviderModelLiteral(trimmed);
+              if (!parsed) {
+                return invalid(resolved.error);
+              }
+              nextProvider = parsed.provider;
+              nextModel = parsed.model;
+            } else {
+              return invalid(resolved.error);
+            }
+          } else {
+            nextProvider = resolved.ref.provider;
+            nextModel = resolved.ref.model;
+          }
+        }
+      } else {
+        if (!params.loadGatewayModelCatalog) {
+          return {
+            ok: false,
+            error: errorShape(ErrorCodes.UNAVAILABLE, "model catalog unavailable"),
+          };
+        }
+        const catalog = await params.loadGatewayModelCatalog();
+        const resolved = resolveAllowedModelRef({
+          cfg,
+          catalog,
+          raw: trimmed,
+          defaultProvider: resolvedDefault.provider,
+          defaultModel: `${resolvedDefault.provider}/${resolvedDefault.model}`,
+        });
+        if ("error" in resolved) {
+          if (isRawSubagentConfiguredModel(trimmed)) {
+            const parsed = parseProviderModelLiteral(trimmed);
+            if (!parsed) {
+              return invalid(resolved.error);
+            }
+            nextProvider = parsed.provider;
+            nextModel = parsed.model;
+          } else {
+            return invalid(resolved.error);
+          }
+        } else {
+          nextProvider = resolved.ref.provider;
+          nextModel = resolved.ref.model;
+        }
       }
-      const catalog = await params.loadGatewayModelCatalog();
-      const resolved = resolveAllowedModelRef({
-        cfg,
-        catalog,
-        raw: trimmed,
-        defaultProvider: resolvedDefault.provider,
-        defaultModel: resolvedDefault.model,
-      });
-      if ("error" in resolved) {
-        return invalid(resolved.error);
-      }
+
       const isDefault =
-        resolved.ref.provider === resolvedDefault.provider &&
-        resolved.ref.model === resolvedDefault.model;
+        nextProvider === resolvedDefault.provider && nextModel === resolvedDefault.model;
       applyModelOverrideToSessionEntry({
         entry: next,
         selection: {
-          provider: resolved.ref.provider,
-          model: resolved.ref.model,
+          provider: nextProvider,
+          model: nextModel,
           isDefault,
         },
       });

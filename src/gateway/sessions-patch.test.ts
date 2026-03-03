@@ -314,4 +314,61 @@ describe("gateway sessions patch", () => {
     expect(entry.providerOverride).toBe("synthetic");
     expect(entry.modelOverride).toBe("hf:moonshotai/Kimi-K2.5");
   });
+
+  test("allows in-group model switches for isolated subagent sessions", async () => {
+    const key = "agent:main:subagent:child";
+    const store: Record<string, SessionEntry> = {};
+    const cfg = {
+      modelIsolation: {
+        enabled: true,
+        main: { model: "openai/gpt-4o", fallbacks: ["openai/gpt-4.1-mini"] },
+        secondary: {
+          model: "moonshot/kimi-k2.5",
+          fallbacks: ["moonshot/kimi-k2.5-turbo"],
+        },
+      },
+    } as OpenClawConfig;
+
+    const res = await applySessionsPatchToStore({
+      cfg,
+      store,
+      storeKey: key,
+      patch: { key, model: "moonshot/kimi-k2.5-turbo" },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) {
+      return;
+    }
+    expect(res.entry.providerOverride).toBe("moonshot");
+    expect(res.entry.modelOverride).toBe("kimi-k2.5-turbo");
+  });
+
+  test("rewrites out-of-group model switches to isolated default", async () => {
+    const key = "agent:main:subagent:child";
+    const store: Record<string, SessionEntry> = {};
+    const cfg = {
+      modelIsolation: {
+        enabled: true,
+        main: { model: "openai/gpt-4o", fallbacks: ["openai/gpt-4.1-mini"] },
+        secondary: {
+          model: "moonshot/kimi-k2.5",
+          fallbacks: ["moonshot/kimi-k2.5-turbo"],
+        },
+      },
+    } as OpenClawConfig;
+
+    const res = await applySessionsPatchToStore({
+      cfg,
+      store,
+      storeKey: key,
+      patch: { key, model: "openai/gpt-4o" },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) {
+      return;
+    }
+    // Rewritten to secondary default -> no explicit override needed.
+    expect(res.entry.providerOverride).toBeUndefined();
+    expect(res.entry.modelOverride).toBeUndefined();
+  });
 });

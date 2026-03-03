@@ -26,6 +26,7 @@ import { resolveAgentDir } from "../agent-scope.js";
 import { formatUserTime, resolveUserTimeFormat, resolveUserTimezone } from "../date-time.js";
 import {
   isModelIsolationEnabled,
+  normalizeIsolationModelRef,
   resolveEditionIsolationParams,
   resolveIsolationAwareModelSelection,
 } from "../edition-isolation.js"; // KOSBLING-PATCH
@@ -153,7 +154,7 @@ async function resolveModelOverride(params: {
     cfg: params.cfg,
     catalog,
     defaultProvider: currentProvider,
-    defaultModel: currentModel,
+    defaultModel: `${currentProvider}/${currentModel}`,
   });
 
   const resolved = resolveModelRefFromString({
@@ -168,12 +169,24 @@ async function resolveModelOverride(params: {
   if (allowed.allowedKeys.size > 0 && !allowed.allowedKeys.has(key)) {
     throw new Error(`Model "${key}" is not allowed.`);
   }
+  const normalized = normalizeIsolationModelRef({
+    cfg: params.cfg,
+    sessionKey: params.sessionKey,
+    raw: key,
+    agentId: params.agentId,
+  });
+  if (normalized && !normalized.ok) {
+    throw new Error(normalized.error);
+  }
+  const normalizedProvider =
+    normalized && normalized.ok ? normalized.provider : resolved.ref.provider;
+  const normalizedModel = normalized && normalized.ok ? normalized.model : resolved.ref.model;
   const isDefault =
-    resolved.ref.provider === configDefault.provider && resolved.ref.model === configDefault.model;
+    normalizedProvider === configDefault.provider && normalizedModel === configDefault.model;
   return {
     kind: "set",
-    provider: resolved.ref.provider,
-    model: resolved.ref.model,
+    provider: normalizedProvider,
+    model: normalizedModel,
     isDefault,
   };
 }
@@ -273,12 +286,6 @@ export function createSessionStatusTool(opts?: {
       const modelRaw = readStringParam(params, "model");
       let changedModel = false;
       if (typeof modelRaw === "string") {
-        const trimmedModel = modelRaw.trim().toLowerCase();
-        if (isolationEnabled && trimmedModel && trimmedModel !== "default") {
-          throw new Error(
-            "Model switching is disabled by modelIsolation policy. Models are managed via modelIsolation config.",
-          );
-        }
         const selection = await resolveModelOverride({
           cfg,
           raw: modelRaw,
