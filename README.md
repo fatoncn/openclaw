@@ -6,7 +6,7 @@ A customized fork of [OpenClaw](https://github.com/openclaw/openclaw) for the [K
 
 - Upstream repository: `https://github.com/openclaw/openclaw.git`
 - Sync strategy: `git merge --no-ff` (preserve merge history)
-- Current baseline: `v2026.2.21`
+- Current baseline: `upstream/main` (synced 2026-03-04, includes `v2026.3.2`)
 
 ## Custom Changes
 
@@ -26,7 +26,7 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Single-line banner: `[Kosbling Edition]`
 
 - **CLI `--version` includes git commit hash** (`src/cli/program/context.ts`)
-  - `openclaw -v` output format: `2026.2.21-kosbling.4 (34ada4a)`
+  - `openclaw -v` output format: `2026.2.24-kosbling.6 (34ada4a)`
 
 - **Update flow disabled** (`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`)
   - `openclaw update` now guides users to `git pull`
@@ -47,11 +47,6 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
 
 > `[Upstream]` means an issue in upstream code. `[Kosbling]` means a follow-up fix needed for our custom behavior.
 
-- **`[Upstream]` HTTP 529 did not trigger model fallback** (`src/agents/failover-error.ts`)
-  - `resolveFailoverReasonFromError` did not recognize 529 (Anthropic overloaded), so fallback chains were skipped
-  - Fix: map 529 into fallback reason `"timeout"`
-  - Related issues: [#28502](https://github.com/openclaw/openclaw/issues/28502), [#8112](https://github.com/openclaw/openclaw/issues/8112)
-
 - **`[Upstream]` HTTP provider errors (401/403/503...) did not trigger model fallback** (`src/agents/pi-embedded-runner/run.ts`)
   - Provider HTTP failures returned as `lastAssistant.stopReason="error"`, wrapped into `isError=true` payloads, and never thrown
   - `runWithModelFallback` catch branch could not trigger
@@ -70,10 +65,12 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Before first runtime model selection, isolation branch could incorrectly display fallback state
   - Fix: add `hasRuntimeModel` guard
 
-- **`[Kosbling]` gateway restart could fork orphan process under launchd** (`src/infra/process-respawn.ts`)
-  - During SIGUSR1 restart, supervised-environment detection could miss launchd context and take detached spawn path
-  - This left an orphan `openclaw-gateway` process holding port `18789`, while LaunchAgent kept retrying and logging `gateway already running`
-  - Fix: treat `XPC_SERVICE_NAME`, `OPENCLAW_LAUNCHD_LABEL`, and `OPENCLAW_SYSTEMD_UNIT` as supervisor hints; restart now returns `supervised` in these contexts
+### Upstream-Covered (no longer fork-only)
+
+- **HTTP 529 classification in failover path** (`src/agents/failover-error.ts`)
+  - Fork behavior switched back to upstream-compatible handling (`529 -> rate_limit`).
+- **Gateway supervised restart guardrails** (`src/infra/process-respawn.ts`)
+  - The current implementation now comes from upstream and includes supervised-env markers + launchd kickstart flow.
 
 ## Model Isolation
 
@@ -183,7 +180,7 @@ Then pull and build in your runtime repo (`~/.openclaw-kosbling`) to deploy.
 
 Version format: `{upstream_version}-kosbling.{patch}`
 
-Example: `2026.2.21-kosbling.3`
+Example: `2026.2.24-kosbling.6`
 
 Version is maintained in root `VERSION`. `build-and-link.sh` reads it and writes into `package.json` during build.
 
@@ -191,10 +188,10 @@ Version is maintained in root `VERSION`. `build-and-link.sh` reads it and writes
 
 ```bash
 # 1) Update VERSION
-echo "2026.2.21-kosbling.3" > VERSION
+echo "2026.2.24-kosbling.6" > VERSION
 
 # 2) Commit and push
-git add -A && git commit -m "release: v2026.2.21-kosbling.3"
+git add -A && git commit -m "release: v2026.2.24-kosbling.6"
 git push origin main
 ```
 

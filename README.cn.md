@@ -6,7 +6,7 @@
 
 - 上游仓库：`https://github.com/openclaw/openclaw.git`
 - 同步方式：`git merge --no-ff` 保留合并记录
-- 当前基线：`v2026.2.21`
+- 当前基线：`upstream/main`（2026-03-04 已同步，包含 `v2026.3.2`）
 
 ## 定制改动
 
@@ -39,11 +39,6 @@
 
 > 标注 `[上游]` 的是官方代码的 bug，`[Kosbling]` 的是我们改造引入需要配套的修复。
 
-- **`[上游]` HTTP 529 不触发 model fallback**（`src/agents/failover-error.ts`）
-  - `resolveFailoverReasonFromError` 不识别 529（Anthropic overloaded），导致 fallback 链被跳过
-  - 修复：将 529 加入 `resolveFailoverReasonFromError`，映射为 "timeout" reason
-  - 相关上游 issue: [#28502](https://github.com/openclaw/openclaw/issues/28502), [#8112](https://github.com/openclaw/openclaw/issues/8112)
-
 - **`[上游]` HTTP provider 错误（401/403/503 等）不触发 model fallback**（`src/agents/pi-embedded-runner/run.ts`）
   - provider 返回 HTTP 错误时，错误以 `lastAssistant.stopReason="error"` 形式返回，被包装为 `isError=true` payload，不抛异常，`runWithModelFallback` 的 catch 永远捕获不到
   - 修复：在 while 循环中检测 `stopReason="error"` 的 assistant 消息，用 `coerceToFailoverError` 分类后抛出 `FailoverError`
@@ -60,10 +55,12 @@
   - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
   - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
 
-- **`[Kosbling]` launchd 下 gateway 重启可能派生孤儿进程**（`src/infra/process-respawn.ts`）
-  - `SIGUSR1` 重启时，受管环境识别可能漏判 launchd，上了 detached spawn 分支
-  - 会遗留一个占用 `18789` 的孤儿 `openclaw-gateway`，同时 LaunchAgent 持续重试并刷出 `gateway already running` 日志
-  - 修复：将 `XPC_SERVICE_NAME`、`OPENCLAW_LAUNCHD_LABEL`、`OPENCLAW_SYSTEMD_UNIT` 纳入 supervisor 判定，命中后走 `supervised` 重启路径
+### 已被上游覆盖（不再是 fork 独有）
+
+- **HTTP 529 failover 分类**（`src/agents/failover-error.ts`）
+  - 当前已按上游兼容语义处理：`529 -> rate_limit`。
+- **Gateway 受管重启与孤儿进程防护**（`src/infra/process-respawn.ts`）
+  - 当前实现来自上游，包含 supervisor marker 识别和 launchd kickstart 逻辑。
 
 ### Model 隔离
 
@@ -173,7 +170,7 @@ git push origin main         # 推送
 
 版本格式：`{upstream_version}-kosbling.{patch}`
 
-例如：`2026.2.21-kosbling.3`
+例如：`2026.2.24-kosbling.6`
 
 版本号维护在仓库根目录的 `VERSION` 文件中，`build-and-link.sh` 构建时自动读取并写入 `package.json`。
 
@@ -181,10 +178,10 @@ git push origin main         # 推送
 
 ```bash
 # 1. 更新 VERSION 文件
-echo "2026.2.21-kosbling.3" > VERSION
+echo "2026.2.24-kosbling.6" > VERSION
 
 # 2. 提交推送
-git add -A && git commit -m "release: v2026.2.21-kosbling.3"
+git add -A && git commit -m "release: v2026.2.24-kosbling.6"
 git push origin main
 ```
 
