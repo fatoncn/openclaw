@@ -3,6 +3,7 @@ import path from "node:path";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
+import { listActiveGuardrailTriggeredSessionsByAgentSync } from "../agents/model-isolation-guardrail.js";
 import {
   inferUniqueProviderFromConfiguredModels,
   parseModelRef,
@@ -736,6 +737,10 @@ export function listSessionsFromStore(params: {
     typeof opts.activeMinutes === "number" && Number.isFinite(opts.activeMinutes)
       ? Math.max(1, Math.floor(opts.activeMinutes))
       : undefined;
+  const guardrailSessionsByAgent = listActiveGuardrailTriggeredSessionsByAgentSync({
+    cfg,
+    agentIds: agentId ? [agentId] : undefined,
+  });
 
   let sessions = Object.entries(store)
     .filter(([key]) => {
@@ -805,6 +810,7 @@ export function listSessionsFromStore(params: {
       const deliveryFields = normalizeSessionDeliveryFields(entry);
       const parsedAgent = parseAgentSessionKey(key);
       const sessionAgentId = normalizeAgentId(parsedAgent?.agentId ?? resolveDefaultAgentId(cfg));
+      const guardrailSessions = guardrailSessionsByAgent.get(sessionAgentId);
       const resolvedModel = resolveSessionModelIdentityRef(cfg, entry, sessionAgentId);
       const modelProvider = resolvedModel.provider;
       const model = resolvedModel.model ?? DEFAULT_MODEL;
@@ -841,6 +847,7 @@ export function listSessionsFromStore(params: {
         lastChannel: deliveryFields.lastChannel ?? entry?.lastChannel,
         lastTo: deliveryFields.lastTo ?? entry?.lastTo,
         lastAccountId: deliveryFields.lastAccountId ?? entry?.lastAccountId,
+        isolationGuardrailTriggered: Boolean(guardrailSessions?.has(key)),
       };
     })
     .toSorted((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));

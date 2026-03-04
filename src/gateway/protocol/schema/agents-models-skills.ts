@@ -44,6 +44,53 @@ export const AgentsListResultSchema = Type.Object(
   { additionalProperties: false },
 );
 
+export const AgentsIsolationGuardrailStatusParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsIsolationGuardrailSessionSchema = Type.Object(
+  {
+    sessionKey: NonEmptyString,
+    triggerCount: Type.Integer({ minimum: 0 }),
+    lastTriggeredAt: Type.Integer({ minimum: 0 }),
+    lastWindowTokens: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsIsolationGuardrailStatusResultSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+    enabled: Type.Boolean(),
+    active: Type.Boolean(),
+    windowMinutes: Type.Optional(Type.Integer({ minimum: 1 })),
+    maxTokens: Type.Optional(Type.Integer({ minimum: 1 })),
+    windowTokens: Type.Optional(Type.Integer({ minimum: 0 })),
+    triggeredAt: Type.Optional(Type.Integer({ minimum: 0 })),
+    triggerSessionKey: Type.Optional(Type.String()),
+    sessions: Type.Array(AgentsIsolationGuardrailSessionSchema),
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsIsolationGuardrailDisableParamsSchema = Type.Object(
+  {
+    agentId: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
+export const AgentsIsolationGuardrailDisableResultSchema = Type.Object(
+  {
+    ok: Type.Literal(true),
+    agentId: NonEmptyString,
+  },
+  { additionalProperties: false },
+);
+
 export const AgentsCreateParamsSchema = Type.Object(
   {
     name: NonEmptyString,

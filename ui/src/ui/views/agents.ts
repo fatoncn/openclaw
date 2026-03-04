@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import type {
   AgentIdentityResult,
   AgentsFilesListResult,
+  AgentsIsolationGuardrailStatusResult,
   AgentsListResult,
   ChannelsStatusSnapshot,
   CronJob,
@@ -29,7 +30,14 @@ import {
   resolveModelPrimary,
 } from "./agents-utils.ts";
 
-export type AgentsPanel = "overview" | "files" | "tools" | "skills" | "channels" | "cron";
+export type AgentsPanel =
+  | "overview"
+  | "files"
+  | "tools"
+  | "skills"
+  | "channels"
+  | "cron"
+  | "isolationGuardrail";
 
 export type AgentsProps = {
   loading: boolean;
@@ -63,6 +71,9 @@ export type AgentsProps = {
   agentSkillsReport: SkillStatusReport | null;
   agentSkillsError: string | null;
   agentSkillsAgentId: string | null;
+  agentIsolationGuardrailLoading: boolean;
+  agentIsolationGuardrailError: string | null;
+  agentIsolationGuardrailStatus: AgentsIsolationGuardrailStatusResult | null;
   toolsCatalogLoading: boolean;
   toolsCatalogError: string | null;
   toolsCatalogResult: ToolsCatalogResult | null;
@@ -88,6 +99,8 @@ export type AgentsProps = {
   onAgentSkillToggle: (agentId: string, skillName: string, enabled: boolean) => void;
   onAgentSkillsClear: (agentId: string) => void;
   onAgentSkillsDisableAll: (agentId: string) => void;
+  onIsolationGuardrailRefresh: (agentId: string) => void;
+  onIsolationGuardrailDisable: (agentId: string) => void;
 };
 
 export type AgentContext = {
@@ -285,6 +298,18 @@ export function renderAgents(props: AgentsProps) {
                       })
                     : nothing
                 }
+                ${
+                  props.activePanel === "isolationGuardrail"
+                    ? renderAgentIsolationGuardrail({
+                        agentId: selectedAgent.id,
+                        loading: props.agentIsolationGuardrailLoading,
+                        error: props.agentIsolationGuardrailError,
+                        status: props.agentIsolationGuardrailStatus,
+                        onRefresh: props.onIsolationGuardrailRefresh,
+                        onDisable: props.onIsolationGuardrailDisable,
+                      })
+                    : nothing
+                }
               `
         }
       </section>
@@ -326,6 +351,7 @@ function renderAgentTabs(active: AgentsPanel, onSelect: (panel: AgentsPanel) => 
     { id: "skills", label: "Skills" },
     { id: "channels", label: "Channels" },
     { id: "cron", label: "Cron Jobs" },
+    { id: "isolationGuardrail", label: "Isolation Guardrail" },
   ];
   return html`
     <div class="agent-tabs">
@@ -341,6 +367,101 @@ function renderAgentTabs(active: AgentsPanel, onSelect: (panel: AgentsPanel) => 
         `,
       )}
     </div>
+  `;
+}
+
+function renderAgentIsolationGuardrail(params: {
+  agentId: string;
+  loading: boolean;
+  error: string | null;
+  status: AgentsIsolationGuardrailStatusResult | null;
+  onRefresh: (agentId: string) => void;
+  onDisable: (agentId: string) => void;
+}) {
+  const status = params.status && params.status.agentId === params.agentId ? params.status : null;
+  const sessions = status?.sessions ?? [];
+  return html`
+    <section class="card">
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <div>
+          <div class="card-title">Isolation Guardrail</div>
+          <div class="card-sub">Main-group token guard for this agent. Secondary sessions are not affected.</div>
+        </div>
+        <div class="row" style="gap: 8px;">
+          <button class="btn btn--sm" ?disabled=${params.loading} @click=${() => params.onRefresh(params.agentId)}>
+            ${params.loading ? "Loading…" : "Refresh"}
+          </button>
+          <button
+            class="btn btn--sm btn--danger"
+            ?disabled=${params.loading || !status?.active}
+            @click=${() => params.onDisable(params.agentId)}
+          >
+            Disable Guardrail
+          </button>
+        </div>
+      </div>
+      ${
+        params.error
+          ? html`<div class="callout danger" style="margin-top: 12px;">${params.error}</div>`
+          : nothing
+      }
+      ${
+        !status
+          ? html`
+              <div class="muted" style="margin-top: 12px">No status yet.</div>
+            `
+          : !status.enabled
+            ? html`
+                <div class="callout" style="margin-top: 12px">Guardrail is disabled in config.</div>
+              `
+            : html`
+                <div class="agents-overview-grid" style="margin-top: 12px;">
+                  <div class="agent-kv">
+                    <div class="agent-kv__label">State</div>
+                    <div class="agent-kv__value">${status.active ? "Triggered" : "Idle"}</div>
+                  </div>
+                  <div class="agent-kv">
+                    <div class="agent-kv__label">Window</div>
+                    <div class="agent-kv__value mono">${status.windowMinutes ?? "-"}m</div>
+                  </div>
+                  <div class="agent-kv">
+                    <div class="agent-kv__label">Threshold</div>
+                    <div class="agent-kv__value mono">${status.maxTokens ?? "-"} tokens</div>
+                  </div>
+                  <div class="agent-kv">
+                    <div class="agent-kv__label">Current Window</div>
+                    <div class="agent-kv__value mono">${status.windowTokens ?? 0} tokens</div>
+                  </div>
+                </div>
+                ${
+                  sessions.length === 0
+                    ? html`
+                        <div class="muted" style="margin-top: 12px">No triggered sessions.</div>
+                      `
+                    : html`
+                        <div class="table" style="margin-top: 12px;">
+                          <div class="table-head">
+                            <span>Session</span>
+                            <span>Triggers</span>
+                            <span>Last Window Tokens</span>
+                            <span>Last Triggered</span>
+                          </div>
+                          ${sessions.map(
+                            (entry) => html`
+                              <div class="table-row">
+                                <span class="mono">${entry.sessionKey}</span>
+                                <span>${entry.triggerCount}</span>
+                                <span>${entry.lastWindowTokens}</span>
+                                <span>${new Date(entry.lastTriggeredAt).toLocaleString()}</span>
+                              </div>
+                            `,
+                          )}
+                        </div>
+                      `
+                }
+              `
+      }
+    </section>
   `;
 }
 

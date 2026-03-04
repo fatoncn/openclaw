@@ -8,9 +8,9 @@ import type {
   ChannelThreadingToolContext,
 } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { createRootScopedReadFile } from "../../infra/fs-safe.js";
 import type { SsrFPolicy } from "../../infra/net/ssrf.js";
 import { resolveTrustedNetworkSsrFPolicy } from "../../infra/net/trusted-network-ssrf.js";
-import { createRootScopedReadFile } from "../../infra/fs-safe.js";
 import { extensionForMime } from "../../media/mime.js";
 import { readBooleanParam as readBooleanParamShared } from "../../plugin-sdk/boolean-param.js";
 import { parseSlackTarget } from "../../slack/targets.js";

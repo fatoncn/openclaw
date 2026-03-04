@@ -5,6 +5,8 @@ import {
   agentsBindingsCommand,
   agentsBindCommand,
   agentsDeleteCommand,
+  agentsIsolationGuardrailDisableCommand,
+  agentsIsolationGuardrailStatusCommand,
   agentsListCommand,
   agentsSetIdentityCommand,
   agentsUnbindCommand,
@@ -160,6 +162,42 @@ ${theme.muted("Docs:")} ${formatDocsLink("/cli/agent", "docs.openclaw.ai/cli/age
             agent: opts.agent as string | undefined,
             bind: Array.isArray(opts.bind) ? (opts.bind as string[]) : undefined,
             all: Boolean(opts.all),
+            json: Boolean(opts.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
+  const isolationGuardrail = agents
+    .command("isolation-guardrail")
+    .description("Manage model-isolation main-token guardrail for one agent");
+
+  isolationGuardrail
+    .option("--agent <id>", "Agent id (defaults to current default agent)")
+    .option("--json", "Output JSON summary", false)
+    .action(async (opts) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await agentsIsolationGuardrailStatusCommand(
+          {
+            agent: opts.agent as string | undefined,
+            json: Boolean(opts.json),
+          },
+          defaultRuntime,
+        );
+      });
+    });
+
+  isolationGuardrail
+    .command("disable")
+    .description("Disable model-isolation main-token guardrail for one agent")
+    .requiredOption("--agent <id>", "Agent id")
+    .option("--json", "Output JSON summary", false)
+    .action(async (opts) => {
+      await runCommandWithRuntime(defaultRuntime, async () => {
+        await agentsIsolationGuardrailDisableCommand(
+          {
+            agent: opts.agent as string | undefined,
             json: Boolean(opts.json),
           },
           defaultRuntime,

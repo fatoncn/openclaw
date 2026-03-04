@@ -37,6 +37,8 @@ const BASE_METHODS = [
   "models.list",
   "tools.catalog",
   "agents.list",
+  "agents.isolation-guardrail.status",
+  "agents.isolation-guardrail.disable",
   "agents.create",
   "agents.update",
   "agents.delete",

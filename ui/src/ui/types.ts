@@ -329,6 +329,30 @@ export type AgentsListResult = {
   agents: GatewayAgentRow[];
 };
 
+export type AgentsIsolationGuardrailSession = {
+  sessionKey: string;
+  triggerCount: number;
+  lastTriggeredAt: number;
+  lastWindowTokens: number;
+};
+
+export type AgentsIsolationGuardrailStatusResult = {
+  agentId: string;
+  enabled: boolean;
+  active: boolean;
+  windowMinutes?: number;
+  maxTokens?: number;
+  windowTokens?: number;
+  triggeredAt?: number;
+  triggerSessionKey?: string;
+  sessions: AgentsIsolationGuardrailSession[];
+};
+
+export type AgentsIsolationGuardrailDisableResult = {
+  ok: true;
+  agentId: string;
+};
+
 export type ToolCatalogProfile = {
   id: "minimal" | "coding" | "messaging" | "full";
   label: string;
@@ -416,6 +440,7 @@ export type GatewaySessionRow = {
   model?: string;
   modelProvider?: string;
   contextTokens?: number;
+  isolationGuardrailTriggered?: boolean;
 };
 
 export type SessionsListResult = SessionsListResultBase<GatewaySessionsDefaults, GatewaySessionRow>;

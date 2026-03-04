@@ -7,6 +7,10 @@ import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.h
 import type { AppViewState } from "./app-view-state.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
 import { loadAgentIdentities, loadAgentIdentity } from "./controllers/agent-identity.ts";
+import {
+  disableAgentIsolationGuardrail,
+  loadAgentIsolationGuardrail,
+} from "./controllers/agent-isolation-guardrail.ts";
 import { loadAgentSkills } from "./controllers/agent-skills.ts";
 import { loadAgents, loadToolsCatalog } from "./controllers/agents.ts";
 import { loadChannels } from "./controllers/channels.ts";
@@ -570,6 +574,9 @@ export function renderApp(state: AppViewState) {
                 agentSkillsReport: state.agentSkillsReport,
                 agentSkillsError: state.agentSkillsError,
                 agentSkillsAgentId: state.agentSkillsAgentId,
+                agentIsolationGuardrailLoading: state.agentIsolationGuardrailLoading,
+                agentIsolationGuardrailError: state.agentIsolationGuardrailError,
+                agentIsolationGuardrailStatus: state.agentIsolationGuardrailStatus,
                 toolsCatalogLoading: state.toolsCatalogLoading,
                 toolsCatalogError: state.toolsCatalogError,
                 toolsCatalogResult: state.toolsCatalogResult,
@@ -586,6 +593,9 @@ export function renderApp(state: AppViewState) {
                   if (agentIds.length > 0) {
                     void loadAgentIdentities(state, agentIds);
                   }
+                  if (state.agentsPanel === "isolationGuardrail" && nextSelected) {
+                    void loadAgentIsolationGuardrail(state, nextSelected);
+                  }
                 },
                 onSelectAgent: (agentId) => {
                   if (state.agentsSelectedId === agentId) {
@@ -601,6 +611,8 @@ export function renderApp(state: AppViewState) {
                   state.agentSkillsReport = null;
                   state.agentSkillsError = null;
                   state.agentSkillsAgentId = null;
+                  state.agentIsolationGuardrailStatus = null;
+                  state.agentIsolationGuardrailError = null;
                   void loadAgentIdentity(state, agentId);
                   if (state.agentsPanel === "tools") {
                     void loadToolsCatalog(state, agentId);
@@ -610,6 +622,9 @@ export function renderApp(state: AppViewState) {
                   }
                   if (state.agentsPanel === "skills") {
                     void loadAgentSkills(state, agentId);
+                  }
+                  if (state.agentsPanel === "isolationGuardrail") {
+                    void loadAgentIsolationGuardrail(state, agentId);
                   }
                 },
                 onSelectPanel: (panel) => {
@@ -637,6 +652,9 @@ export function renderApp(state: AppViewState) {
                   }
                   if (panel === "cron") {
                     void state.loadCron();
+                  }
+                  if (panel === "isolationGuardrail" && resolvedAgentId) {
+                    void loadAgentIsolationGuardrail(state, resolvedAgentId);
                   }
                 },
                 onLoadFiles: (agentId) => loadAgentFiles(state, agentId),
@@ -807,6 +825,14 @@ export function renderApp(state: AppViewState) {
                     return;
                   }
                   updateConfigFormValue(state, ["agents", "list", index, "skills"], []);
+                },
+                onIsolationGuardrailRefresh: (agentId) => {
+                  void loadAgentIsolationGuardrail(state, agentId);
+                },
+                onIsolationGuardrailDisable: (agentId) => {
+                  void disableAgentIsolationGuardrail(state, agentId).then(() => {
+                    void loadSessions(state);
+                  });
                 },
                 onModelChange: (agentId, modelId) => {
                   if (!configValue) {

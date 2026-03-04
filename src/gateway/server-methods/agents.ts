@@ -2,9 +2,14 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   listAgentIds,
+  resolveDefaultAgentId,
   resolveAgentDir,
   resolveAgentWorkspaceDir,
 } from "../../agents/agent-scope.js";
+import {
+  disableMainTokenGuardrail,
+  getMainTokenGuardrailStatus,
+} from "../../agents/model-isolation-guardrail.js";
 import {
   DEFAULT_AGENTS_FILENAME,
   DEFAULT_BOOTSTRAP_FILENAME,
@@ -42,6 +47,8 @@ import {
   validateAgentsFilesGetParams,
   validateAgentsFilesListParams,
   validateAgentsFilesSetParams,
+  validateAgentsIsolationGuardrailDisableParams,
+  validateAgentsIsolationGuardrailStatusParams,
   validateAgentsListParams,
   validateAgentsUpdateParams,
 } from "../protocol/index.js";
@@ -472,6 +479,64 @@ export const agentsHandlers: GatewayRequestHandlers = {
     const cfg = loadConfig();
     const result = listAgentsForGateway(cfg);
     respond(true, result, undefined);
+  },
+  "agents.isolation-guardrail.status": async ({ params, respond }) => {
+    if (!validateAgentsIsolationGuardrailStatusParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid agents.isolation-guardrail.status params: ${formatValidationErrors(
+            validateAgentsIsolationGuardrailStatusParams.errors,
+          )}`,
+        ),
+      );
+      return;
+    }
+    const cfg = loadConfig();
+    const requested = normalizeAgentId(String(params.agentId ?? "").trim());
+    const known = new Set(listAgentIds(cfg));
+    const agentId = requested || resolveDefaultAgentId(cfg);
+    if (!known.has(agentId)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `unknown agent id "${agentId}"`),
+      );
+      return;
+    }
+    const status = await getMainTokenGuardrailStatus({ cfg, agentId });
+    respond(true, status, undefined);
+  },
+  "agents.isolation-guardrail.disable": async ({ params, respond }) => {
+    if (!validateAgentsIsolationGuardrailDisableParams(params)) {
+      respond(
+        false,
+        undefined,
+        errorShape(
+          ErrorCodes.INVALID_REQUEST,
+          `invalid agents.isolation-guardrail.disable params: ${formatValidationErrors(
+            validateAgentsIsolationGuardrailDisableParams.errors,
+          )}`,
+        ),
+      );
+      return;
+    }
+    const cfg = loadConfig();
+    const requested = normalizeAgentId(String(params.agentId ?? "").trim());
+    const known = new Set(listAgentIds(cfg));
+    const agentId = requested || resolveDefaultAgentId(cfg);
+    if (!known.has(agentId)) {
+      respond(
+        false,
+        undefined,
+        errorShape(ErrorCodes.INVALID_REQUEST, `unknown agent id "${agentId}"`),
+      );
+      return;
+    }
+    await disableMainTokenGuardrail({ cfg, agentId });
+    respond(true, { ok: true, agentId }, undefined);
   },
   "agents.create": async ({ params, respond }) => {
     if (!validateAgentsCreateParams(params)) {

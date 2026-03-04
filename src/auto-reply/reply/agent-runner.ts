@@ -2,6 +2,10 @@ import fs from "node:fs";
 import { lookupContextTokens } from "../../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS } from "../../agents/defaults.js";
 import { resolveModelAuthMode } from "../../agents/model-auth.js";
+import {
+  checkMainTokenGuardrailBlocked,
+  recordMainTokenGuardrailUsage,
+} from "../../agents/model-isolation-guardrail.js";
 import { isCliProvider } from "../../agents/model-selection.js";
 import { queueEmbeddedPiMessage } from "../../agents/pi-embedded.js";
 import { hasNonzeroUsage } from "../../agents/usage.js";
@@ -245,6 +249,28 @@ export async function runReplyAgent(params: {
     defaultModel,
     agentCfgContextTokens,
   });
+  const guardrailAgentId =
+    followupRun.run.agentId ??
+    (sessionKey ? resolveAgentIdFromSessionKey(sessionKey) : followupRun.run.agentId);
+
+  if (sessionKey && guardrailAgentId) {
+    const guardrailStatus = await checkMainTokenGuardrailBlocked({
+      cfg,
+      agentId: guardrailAgentId,
+      sessionKey,
+    });
+    if (guardrailStatus.enabled && guardrailStatus.active) {
+      const message = `⚠️ Isolation guardrail is active for agent "${guardrailAgentId}". Main-group sessions are paused to protect token budget.\n\nSecondary-group sessions are not affected. Disable it in WebChat (Agents -> Isolation Guardrail), or run:\nopenclaw agents isolation-guardrail disable --agent ${guardrailAgentId}`;
+      return finalizeWithFollowup(
+        {
+          text: message,
+          isError: true,
+        },
+        queueKey,
+        runFollowupTurn,
+      );
+    }
+  }
 
   let responseUsageLine: string | undefined;
   type SessionResetOptions = {
@@ -590,6 +616,27 @@ export async function runReplyAgent(params: {
         responseUsageLine = formatted;
       }
     }
+    let guardrailTriggerNotice: string | undefined;
+    if (sessionKey && guardrailAgentId) {
+      const usageTotal =
+        runResult.meta?.agentMeta?.lastCallUsage?.total ??
+        usage?.total ??
+        (usage?.input ?? 0) +
+          (usage?.output ?? 0) +
+          (usage?.cacheRead ?? 0) +
+          (usage?.cacheWrite ?? 0);
+      if (Number.isFinite(usageTotal) && usageTotal > 0) {
+        const guardrailResult = await recordMainTokenGuardrailUsage({
+          cfg,
+          agentId: guardrailAgentId,
+          sessionKey,
+          tokens: usageTotal,
+        });
+        if (guardrailResult.triggered) {
+          guardrailTriggerNotice = `⚠️ Isolation guardrail triggered for agent "${guardrailAgentId}" (${guardrailResult.windowTokens}/${guardrailResult.maxTokens} tokens in ${guardrailResult.windowMinutes}m). Main-group sessions are now paused until manually disabled.`;
+        }
+      }
+    }
 
     // If verbose is enabled, prepend operational run notices.
     let finalPayloads = guardedReplyPayloads;
@@ -687,6 +734,9 @@ export async function runReplyAgent(params: {
     }
     if (responseUsageLine) {
       finalPayloads = appendUsageLine(finalPayloads, responseUsageLine);
+    }
+    if (guardrailTriggerNotice) {
+      finalPayloads = [{ text: guardrailTriggerNotice, isError: true }, ...finalPayloads];
     }
 
     return finalizeWithFollowup(

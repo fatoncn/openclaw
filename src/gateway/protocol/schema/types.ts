@@ -79,6 +79,14 @@ export type AgentsFilesSetParams = SchemaType<"AgentsFilesSetParams">;
 export type AgentsFilesSetResult = SchemaType<"AgentsFilesSetResult">;
 export type AgentsListParams = SchemaType<"AgentsListParams">;
 export type AgentsListResult = SchemaType<"AgentsListResult">;
+export type AgentsIsolationGuardrailStatusParams =
+  SchemaType<"AgentsIsolationGuardrailStatusParams">;
+export type AgentsIsolationGuardrailStatusResult =
+  SchemaType<"AgentsIsolationGuardrailStatusResult">;
+export type AgentsIsolationGuardrailDisableParams =
+  SchemaType<"AgentsIsolationGuardrailDisableParams">;
+export type AgentsIsolationGuardrailDisableResult =
+  SchemaType<"AgentsIsolationGuardrailDisableResult">;
 export type ModelChoice = SchemaType<"ModelChoice">;
 export type ModelsListParams = SchemaType<"ModelsListParams">;
 export type ModelsListResult = SchemaType<"ModelsListResult">;

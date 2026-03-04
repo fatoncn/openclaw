@@ -133,6 +133,11 @@ export type OpenClawConfig = {
     main?: {
       model?: string;
       fallbacks?: string[];
+      tokenGuardrail?: {
+        enabled?: boolean;
+        windowMinutes?: number;
+        maxTokens?: number;
+      };
     };
     secondary?: {
       model?: string;

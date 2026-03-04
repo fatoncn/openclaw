@@ -24,6 +24,14 @@ import {
   AgentsDeleteParamsSchema,
   type AgentsDeleteResult,
   AgentsDeleteResultSchema,
+  type AgentsIsolationGuardrailDisableParams,
+  AgentsIsolationGuardrailDisableParamsSchema,
+  type AgentsIsolationGuardrailDisableResult,
+  AgentsIsolationGuardrailDisableResultSchema,
+  type AgentsIsolationGuardrailStatusParams,
+  AgentsIsolationGuardrailStatusParamsSchema,
+  type AgentsIsolationGuardrailStatusResult,
+  AgentsIsolationGuardrailStatusResultSchema,
   type AgentsFilesGetParams,
   AgentsFilesGetParamsSchema,
   type AgentsFilesGetResult,
@@ -254,6 +262,10 @@ export const validateAgentIdentityParams =
 export const validateAgentWaitParams = ajv.compile<AgentWaitParams>(AgentWaitParamsSchema);
 export const validateWakeParams = ajv.compile<WakeParams>(WakeParamsSchema);
 export const validateAgentsListParams = ajv.compile<AgentsListParams>(AgentsListParamsSchema);
+export const validateAgentsIsolationGuardrailStatusParams =
+  ajv.compile<AgentsIsolationGuardrailStatusParams>(AgentsIsolationGuardrailStatusParamsSchema);
+export const validateAgentsIsolationGuardrailDisableParams =
+  ajv.compile<AgentsIsolationGuardrailDisableParams>(AgentsIsolationGuardrailDisableParamsSchema);
 export const validateAgentsCreateParams = ajv.compile<AgentsCreateParams>(AgentsCreateParamsSchema);
 export const validateAgentsUpdateParams = ajv.compile<AgentsUpdateParams>(AgentsUpdateParamsSchema);
 export const validateAgentsDeleteParams = ajv.compile<AgentsDeleteParams>(AgentsDeleteParamsSchema);
@@ -491,6 +503,10 @@ export {
   AgentsUpdateResultSchema,
   AgentsDeleteParamsSchema,
   AgentsDeleteResultSchema,
+  AgentsIsolationGuardrailStatusParamsSchema,
+  AgentsIsolationGuardrailStatusResultSchema,
+  AgentsIsolationGuardrailDisableParamsSchema,
+  AgentsIsolationGuardrailDisableResultSchema,
   AgentsFilesListParamsSchema,
   AgentsFilesListResultSchema,
   AgentsFilesGetParamsSchema,
@@ -581,6 +597,10 @@ export type {
   AgentsUpdateResult,
   AgentsDeleteParams,
   AgentsDeleteResult,
+  AgentsIsolationGuardrailStatusParams,
+  AgentsIsolationGuardrailStatusResult,
+  AgentsIsolationGuardrailDisableParams,
+  AgentsIsolationGuardrailDisableResult,
   AgentsFilesListParams,
   AgentsFilesListResult,
   AgentsFilesGetParams,

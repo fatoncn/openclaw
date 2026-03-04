@@ -59,6 +59,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
     "models.list",
     "tools.catalog",
     "agents.list",
+    "agents.isolation-guardrail.status",
     "agent.identity.get",
     "skills.status",
     "voicewake.get",
@@ -102,6 +103,7 @@ const METHOD_SCOPE_GROUPS: Record<OperatorScope, readonly string[]> = {
   [ADMIN_SCOPE]: [
     "channels.logout",
     "agents.create",
+    "agents.isolation-guardrail.disable",
     "agents.update",
     "agents.delete",
     "skills.install",

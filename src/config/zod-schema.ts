@@ -788,6 +788,14 @@ export const OpenClawSchema = z
           .object({
             model: z.string().optional(),
             fallbacks: z.array(z.string()).optional(),
+            tokenGuardrail: z
+              .object({
+                enabled: z.boolean().optional(),
+                windowMinutes: z.number().int().min(1).optional(),
+                maxTokens: z.number().int().min(1).optional(),
+              })
+              .strict()
+              .optional(),
           })
           .strict()
           .optional(),
