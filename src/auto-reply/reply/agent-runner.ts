@@ -62,6 +62,38 @@ import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
 const BLOCK_REPLY_SEND_TIMEOUT_MS = 15_000;
+const MAIN_GUARDRAIL_INPUT_WEIGHT = 1;
+const MAIN_GUARDRAIL_CACHE_READ_WEIGHT = 0.1;
+const MAIN_GUARDRAIL_CACHE_WRITE_WEIGHT = 1.2;
+const MAIN_GUARDRAIL_OUTPUT_WEIGHT = 5;
+
+type GuardrailUsageSnapshot = {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  total?: number;
+};
+
+function resolveWeightedMainGuardrailTokens(usage?: GuardrailUsageSnapshot): number {
+  if (!usage) {
+    return 0;
+  }
+  const input = Number.isFinite(usage.input) ? Math.max(0, usage.input ?? 0) : 0;
+  const output = Number.isFinite(usage.output) ? Math.max(0, usage.output ?? 0) : 0;
+  const cacheRead = Number.isFinite(usage.cacheRead) ? Math.max(0, usage.cacheRead ?? 0) : 0;
+  const cacheWrite = Number.isFinite(usage.cacheWrite) ? Math.max(0, usage.cacheWrite ?? 0) : 0;
+  const weightedTotal =
+    input * MAIN_GUARDRAIL_INPUT_WEIGHT +
+    cacheRead * MAIN_GUARDRAIL_CACHE_READ_WEIGHT +
+    cacheWrite * MAIN_GUARDRAIL_CACHE_WRITE_WEIGHT +
+    output * MAIN_GUARDRAIL_OUTPUT_WEIGHT;
+  if (weightedTotal > 0) {
+    return weightedTotal;
+  }
+  const fallbackTotal = Number.isFinite(usage.total) ? Math.max(0, usage.total ?? 0) : 0;
+  return fallbackTotal;
+}
 
 export async function runReplyAgent(params: {
   commandBody: string;
@@ -618,13 +650,8 @@ export async function runReplyAgent(params: {
     }
     let guardrailTriggerNotice: string | undefined;
     if (sessionKey && guardrailAgentId) {
-      const usageTotal =
-        runResult.meta?.agentMeta?.lastCallUsage?.total ??
-        usage?.total ??
-        (usage?.input ?? 0) +
-          (usage?.output ?? 0) +
-          (usage?.cacheRead ?? 0) +
-          (usage?.cacheWrite ?? 0);
+      const usageForGuardrail = runResult.meta?.agentMeta?.lastCallUsage ?? usage;
+      const usageTotal = resolveWeightedMainGuardrailTokens(usageForGuardrail);
       if (Number.isFinite(usageTotal) && usageTotal > 0) {
         const guardrailResult = await recordMainTokenGuardrailUsage({
           cfg,

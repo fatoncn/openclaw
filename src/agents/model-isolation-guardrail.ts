@@ -154,7 +154,7 @@ function sanitizeState(
         : 0;
     const lastWindowTokens =
       typeof value.lastWindowTokens === "number" && Number.isFinite(value.lastWindowTokens)
-        ? Math.max(0, Math.floor(value.lastWindowTokens))
+        ? Math.max(0, value.lastWindowTokens)
         : 0;
     if (!sessionKey.trim()) {
       continue;
@@ -186,7 +186,7 @@ function sanitizeState(
         })
         .map((event) => ({
           at: event.at,
-          tokens: Math.max(0, Math.floor(event.tokens)),
+          tokens: Math.max(0, event.tokens),
           sessionKey: event.sessionKey,
         }))
     : [];
@@ -206,13 +206,13 @@ function sanitizeState(
       triggerWindowTokens:
         typeof rawMain.triggerWindowTokens === "number" &&
         Number.isFinite(rawMain.triggerWindowTokens)
-          ? Math.max(0, Math.floor(rawMain.triggerWindowTokens))
+          ? Math.max(0, rawMain.triggerWindowTokens)
           : undefined,
       windowMinutes: config.windowMinutes,
       maxTokens: config.maxTokens,
       lastWindowTokens:
         typeof rawMain.lastWindowTokens === "number" && Number.isFinite(rawMain.lastWindowTokens)
-          ? Math.max(0, Math.floor(rawMain.lastWindowTokens))
+          ? Math.max(0, rawMain.lastWindowTokens)
           : 0,
       sessions: sessionsRecord,
       events,
@@ -361,7 +361,7 @@ export async function recordMainTokenGuardrailUsage(params: {
   if (!config.enabled || resolveGroupFromSessionKey(params.sessionKey) !== "main") {
     return { enabled: config.enabled, triggered: false, active: false };
   }
-  const tokens = Number.isFinite(params.tokens) ? Math.max(0, Math.floor(params.tokens)) : 0;
+  const tokens = Number.isFinite(params.tokens) ? Math.max(0, params.tokens) : 0;
   if (tokens <= 0) {
     return { enabled: true, triggered: false, active: false };
   }
