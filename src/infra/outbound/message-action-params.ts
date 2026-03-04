@@ -9,6 +9,8 @@ import type {
   ChannelThreadingToolContext,
 } from "../../channels/plugins/types.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import type { SsrFPolicy } from "../../infra/net/ssrf.js";
+import { resolveTrustedNetworkSsrFPolicy } from "../../infra/net/trusted-network-ssrf.js";
 import { extensionForMime } from "../../media/mime.js";
 import { parseSlackTarget } from "../../slack/targets.js";
 import { parseTelegramTarget } from "../../telegram/targets.js";
@@ -197,6 +199,7 @@ export function resolveAttachmentMediaPolicy(params: {
 }
 
 function buildAttachmentMediaLoadOptions(params: {
+  cfg: OpenClawConfig;
   policy: AttachmentMediaPolicy;
   maxBytes?: number;
 }):
@@ -208,6 +211,7 @@ function buildAttachmentMediaLoadOptions(params: {
   | {
       maxBytes?: number;
       localRoots?: readonly string[];
+      ssrfPolicy?: SsrFPolicy;
     } {
   if (params.policy.mode === "sandbox") {
     return {
@@ -216,9 +220,14 @@ function buildAttachmentMediaLoadOptions(params: {
       readFile: (filePath: string) => fs.readFile(filePath),
     };
   }
+  const trustedNetworkSsrFPolicy = resolveTrustedNetworkSsrFPolicy(params.cfg);
   return {
     maxBytes: params.maxBytes,
     localRoots: params.policy.localRoots,
+    ssrfPolicy:
+      trustedNetworkSsrFPolicy?.dangerouslyAllowPrivateNetwork === true
+        ? { dangerouslyAllowPrivateNetwork: true }
+        : undefined,
   };
 }
 
@@ -257,7 +266,7 @@ async function hydrateAttachmentPayload(params: {
     });
     const media = await loadWebMedia(
       mediaSource,
-      buildAttachmentMediaLoadOptions({ policy: params.mediaPolicy, maxBytes }),
+      buildAttachmentMediaLoadOptions({ cfg: params.cfg, policy: params.mediaPolicy, maxBytes }),
     );
     params.args.buffer = media.buffer.toString("base64");
     if (!contentTypeParam && media.contentType) {

@@ -213,6 +213,18 @@ export const FIELD_HELP: Record<string, string> = {
     "Explicit hostname allowlist exceptions for SSRF policy checks on browser/network requests. Keep this list minimal and review entries regularly to avoid stale broad access.",
   "browser.ssrfPolicy.hostnameAllowlist":
     "Legacy/alternate hostname allowlist field used by SSRF policy consumers for explicit host exceptions. Use stable exact hostnames and avoid wildcard-like broad patterns.",
+  network:
+    "Global network security defaults shared by non-browser tools that perform outbound fetches. Use this to set one trusted-network SSRF policy for tools like web_fetch and media download paths.",
+  "network.ssrfPolicy":
+    "Global SSRF policy defaults for non-browser tools. Tool-specific SSRF policies can override these defaults when needed.",
+  "network.ssrfPolicy.allowPrivateNetwork":
+    "Legacy alias for network.ssrfPolicy.dangerouslyAllowPrivateNetwork. Prefer the dangerously-named key so risk intent is explicit.",
+  "network.ssrfPolicy.dangerouslyAllowPrivateNetwork":
+    "Allows private/internal IP ranges for non-browser network tools. Keep disabled by default and enable only on trusted operator networks (for example VPN/Clash fake-ip setups).",
+  "network.ssrfPolicy.allowedHostnames":
+    "Explicit hostname allowlist exceptions applied globally to non-browser SSRF checks. Keep this list minimal and review regularly.",
+  "network.ssrfPolicy.hostnameAllowlist":
+    "Optional global hostname allowlist patterns (exact host or *.suffix) for non-browser tools. Use narrow patterns to reduce accidental overexposure.",
   "browser.remoteCdpTimeoutMs":
     "Timeout in milliseconds for connecting to a remote CDP endpoint before failing the browser attach attempt. Increase for high-latency tunnels, or lower for faster failure detection.",
   "browser.remoteCdpHandshakeTimeoutMs":

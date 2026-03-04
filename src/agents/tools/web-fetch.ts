@@ -2,6 +2,7 @@ import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
 import { fetchWithSsrFGuard } from "../../infra/net/fetch-guard.js";
 import { SsrFBlockedError, type SsrFPolicy } from "../../infra/net/ssrf.js";
+import { resolveTrustedNetworkSsrFPolicy } from "../../infra/net/trusted-network-ssrf.js";
 import { logDebug } from "../../logger.js";
 import { wrapExternalContent, wrapWebContent } from "../../security/external-content.js";
 import { normalizeSecretInput } from "../../utils/normalize-secret-input.js";
@@ -109,21 +110,34 @@ function normalizeStringList(values: string[] | undefined): string[] | undefined
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function resolveFetchSsrFPolicy(fetch?: WebFetchConfig): SsrFPolicy | undefined {
+function resolveFetchSsrFPolicy(params: {
+  fetch?: WebFetchConfig;
+  cfg?: OpenClawConfig;
+}): SsrFPolicy | undefined {
+  const fetch = params.fetch;
   const allowPrivateNetwork = fetch?.ssrfPolicy?.allowPrivateNetwork;
   const allowedHostnames = normalizeStringList(fetch?.ssrfPolicy?.allowedHostnames);
   const hostnameAllowlist = normalizeStringList(fetch?.ssrfPolicy?.hostnameAllowlist);
-  if (
-    allowPrivateNetwork === undefined &&
-    allowedHostnames === undefined &&
-    hostnameAllowlist === undefined
-  ) {
-    return undefined;
+  const toolPolicy =
+    allowPrivateNetwork === undefined && !allowedHostnames && !hostnameAllowlist
+      ? undefined
+      : {
+          ...(allowPrivateNetwork === true ? { allowPrivateNetwork: true } : {}),
+          ...(allowedHostnames ? { allowedHostnames } : {}),
+          ...(hostnameAllowlist ? { hostnameAllowlist } : {}),
+        };
+  const trustedNetworkPolicy = resolveTrustedNetworkSsrFPolicy(params.cfg);
+
+  if (!toolPolicy) {
+    return trustedNetworkPolicy;
   }
+  if (!trustedNetworkPolicy || typeof trustedNetworkPolicy !== "object") {
+    return toolPolicy;
+  }
+  // Tool-specific config wins over trusted-network defaults when both are present.
   return {
-    ...(allowPrivateNetwork === true ? { allowPrivateNetwork: true } : {}),
-    ...(allowedHostnames ? { allowedHostnames } : {}),
-    ...(hostnameAllowlist ? { hostnameAllowlist } : {}),
+    ...trustedNetworkPolicy,
+    ...toolPolicy,
   };
 }
 
@@ -760,7 +774,7 @@ export function createWebFetchTool(options?: {
     (fetch && "userAgent" in fetch && typeof fetch.userAgent === "string" && fetch.userAgent) ||
     DEFAULT_FETCH_USER_AGENT;
   const maxResponseBytes = resolveFetchMaxResponseBytes(fetch);
-  const ssrfPolicy = resolveFetchSsrFPolicy(fetch);
+  const ssrfPolicy = resolveFetchSsrFPolicy({ fetch, cfg: options?.config });
   return {
     label: "Web Fetch",
     name: "web_fetch",

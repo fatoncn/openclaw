@@ -44,10 +44,17 @@ async function createWebFetchToolForTest(params?: {
     allowedHostnames?: string[];
     hostnameAllowlist?: string[];
   };
+  networkSsrfPolicy?: {
+    allowPrivateNetwork?: boolean;
+    dangerouslyAllowPrivateNetwork?: boolean;
+    allowedHostnames?: string[];
+    hostnameAllowlist?: string[];
+  };
 }) {
   const { createWebFetchTool } = await import("./web-tools.js");
   return createWebFetchTool({
     config: {
+      ...(params?.networkSsrfPolicy ? { network: { ssrfPolicy: params.networkSsrfPolicy } } : {}),
       tools: {
         web: {
           fetch: {
@@ -158,6 +165,21 @@ describe("web_fetch SSRF protection", () => {
     });
 
     const result = await tool?.execute?.("call", { url: "http://198.18.0.1/test" });
+    expect(result?.details).toMatchObject({
+      status: 200,
+      extractor: "raw",
+    });
+  });
+
+  it("inherits trusted-network policy from network.ssrfPolicy", async () => {
+    lookupMock.mockResolvedValue([{ address: "198.18.0.1", family: 4 }]);
+
+    setMockFetch().mockResolvedValue(textResponse("ok"));
+    const tool = await createWebFetchToolForTest({
+      networkSsrfPolicy: { dangerouslyAllowPrivateNetwork: true },
+    });
+
+    const result = await tool?.execute?.("call", { url: "https://httpbin.org/get" });
     expect(result?.details).toMatchObject({
       status: 200,
       extractor: "raw",

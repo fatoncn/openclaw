@@ -1,6 +1,7 @@
 import { type Api, type Context, complete, type Model } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawConfig } from "../../config/config.js";
+import { resolveTrustedNetworkSsrFPolicy } from "../../infra/net/trusted-network-ssrf.js";
 import { resolveUserPath } from "../../utils.js";
 import { getDefaultLocalRoots, loadWebMedia } from "../../web/media.js";
 import { ensureAuthProfileStore, listProfilesForProvider } from "../auth-profiles.js";
@@ -340,6 +341,7 @@ export function createImageTool(options?: {
     }
     return Array.from(new Set([...roots, workspaceDir]));
   })();
+  const trustedNetworkSsrFPolicy = resolveTrustedNetworkSsrFPolicy(options?.config);
 
   return {
     label: "Image",
@@ -502,6 +504,7 @@ export function createImageTool(options?: {
             : await loadWebMedia(resolvedPath ?? resolvedImage, {
                 maxBytes,
                 localRoots,
+                ssrfPolicy: trustedNetworkSsrFPolicy,
               });
         if (media.kind !== "image") {
           throw new Error(`Unsupported media type: ${media.kind}`);

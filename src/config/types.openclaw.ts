@@ -76,6 +76,19 @@ export type OpenClawConfig = {
     };
   };
   browser?: BrowserConfig;
+  network?: {
+    /** Global SSRF policy defaults for non-browser network tools (web_fetch, media fetchers, etc.). */
+    ssrfPolicy?: {
+      /** Legacy alias for private-network access. Prefer dangerouslyAllowPrivateNetwork. */
+      allowPrivateNetwork?: boolean;
+      /** If true, permit private/internal network targets for tools that inherit global policy. */
+      dangerouslyAllowPrivateNetwork?: boolean;
+      /** Explicitly allowed hostnames (exact-match), including blocked names like localhost. */
+      allowedHostnames?: string[];
+      /** Hostname allowlist patterns (exact host or *.suffix). */
+      hostnameAllowlist?: string[];
+    };
+  };
   ui?: {
     /** Accent color for OpenClaw UI chrome (hex). */
     seamColor?: string;
