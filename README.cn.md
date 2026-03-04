@@ -170,7 +170,7 @@ git push origin main         # 推送
 
 版本格式：`{upstream_version}-kosbling.{patch}`
 
-例如：`2026.2.24-kosbling.6`
+例如：`2026.3.3-kosbling.6`
 
 版本号维护在仓库根目录的 `VERSION` 文件中，`build-and-link.sh` 构建时自动读取并写入 `package.json`。
 
@@ -178,10 +178,10 @@ git push origin main         # 推送
 
 ```bash
 # 1. 更新 VERSION 文件
-echo "2026.2.24-kosbling.6" > VERSION
+echo "2026.3.3-kosbling.6" > VERSION
 
 # 2. 提交推送
-git add -A && git commit -m "release: v2026.2.24-kosbling.6"
+git add -A && git commit -m "release: v2026.3.3-kosbling.6"
 git push origin main
 ```
 
