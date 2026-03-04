@@ -134,6 +134,29 @@ describe("buildEmbeddedRunPayloads", () => {
     expect(payloads[1]?.text).toBe("B");
   });
 
+  it("keeps feishu p2p multi-text payloads when block_deliver.dm_enable is true", () => {
+    const cfg = {
+      agents: {
+        defaults: {
+          block_deliver: {
+            block_disable: true,
+            dm_enable: true,
+          },
+        },
+      },
+    } as OpenClawConfig;
+    const payloads = buildPayloads({
+      assistantTexts: ["A", "B"],
+      config: cfg,
+      messageProvider: "feishu",
+      chatType: "p2p",
+    });
+
+    expect(payloads).toHaveLength(2);
+    expect(payloads[0]?.text).toBe("A");
+    expect(payloads[1]?.text).toBe("B");
+  });
+
   it("suppresses pretty-printed error JSON that differs from the errorMessage", () => {
     const payloads = buildPayloads({
       assistantTexts: [errorJsonPretty],
