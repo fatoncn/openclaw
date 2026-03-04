@@ -36,6 +36,13 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Adds Kosbling Edition guidance to all agent system prompts
   - Includes model-isolation behavior and config guidance
 
+- **Global network SSRF policy for tool fetch paths** (`src/infra/net/trusted-network-ssrf.ts` + related tools/config)
+  - Adds root-level `network.ssrfPolicy` as the default SSRF policy for non-browser network tools
+  - Current inherited paths: `web_fetch`, `image` remote URL loading, and message attachment URL fetching
+  - `tools.web.fetch.ssrfPolicy` remains a per-tool override (higher priority than `network.ssrfPolicy`)
+  - Legacy compatibility: if `network.ssrfPolicy` is unset, runtime falls back to `browser.ssrfPolicy`
+  - Recommended steady-state: use `network.ssrfPolicy` for global behavior and keep browser policy browser-scoped
+
 ### Bug Fixes
 
 > `[Upstream]` means an issue in upstream code. `[Kosbling]` means a follow-up fix needed for our custom behavior.

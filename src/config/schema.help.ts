@@ -216,7 +216,7 @@ export const FIELD_HELP: Record<string, string> = {
   network:
     "Global network security defaults shared by non-browser tools that perform outbound fetches. Use this to set one trusted-network SSRF policy for tools like web_fetch and media download paths.",
   "network.ssrfPolicy":
-    "Global SSRF policy defaults for non-browser tools. Tool-specific SSRF policies can override these defaults when needed.",
+    "Global SSRF policy defaults for non-browser tools. Tool-specific SSRF policies (for example tools.web.fetch.ssrfPolicy) can override these defaults when needed.",
   "network.ssrfPolicy.allowPrivateNetwork":
     "Legacy alias for network.ssrfPolicy.dangerouslyAllowPrivateNetwork. Prefer the dangerously-named key so risk intent is explicit.",
   "network.ssrfPolicy.dangerouslyAllowPrivateNetwork":
@@ -609,13 +609,13 @@ export const FIELD_HELP: Record<string, string> = {
   "tools.web.fetch.readability":
     "Use Readability to extract main content from HTML (fallbacks to basic HTML cleanup).",
   "tools.web.fetch.ssrfPolicy":
-    "SSRF policy for web_fetch targets (private network and hostname allow controls).",
+    "SSRF policy override for web_fetch targets. If unset, web_fetch inherits network.ssrfPolicy (or legacy browser.ssrfPolicy fallback).",
   "tools.web.fetch.ssrfPolicy.allowPrivateNetwork":
-    "Allow private/internal IP ranges for web_fetch (default: blocked).",
+    "When set, overrides inherited private-network behavior for web_fetch (legacy alias for dangerous allow semantics).",
   "tools.web.fetch.ssrfPolicy.allowedHostnames":
-    "Explicit hostnames allowed for web_fetch, even if they resolve to private addresses.",
+    "Explicit hostnames allowed for web_fetch; merges over inherited global policy.",
   "tools.web.fetch.ssrfPolicy.hostnameAllowlist":
-    "Restrict web_fetch targets to hostnames matching this allowlist (exact or *.suffix).",
+    "Restrict web_fetch targets to hostnames matching this allowlist (exact or *.suffix), overriding inherited global policy.",
   "tools.web.fetch.firecrawl.enabled": "Enable Firecrawl fallback for web_fetch (if configured).",
   "tools.web.fetch.firecrawl.apiKey": "Firecrawl API key (fallback: FIRECRAWL_API_KEY env var).",
   "tools.web.fetch.firecrawl.baseUrl":
