@@ -247,11 +247,12 @@ export async function runEmbeddedPiAgent(
       let provider = (params.provider ?? DEFAULT_PROVIDER).trim() || DEFAULT_PROVIDER;
       let modelId = (params.model ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL;
       const agentDir = params.agentDir ?? resolveOpenClawAgentDir();
-      const fallbackConfigured = hasConfiguredModelFallbacks({
-        cfg: params.config,
-        agentId: params.agentId,
-        sessionKey: params.sessionKey,
-      }) ||
+      const fallbackConfigured =
+        hasConfiguredModelFallbacks({
+          cfg: params.config,
+          agentId: params.agentId,
+          sessionKey: params.sessionKey,
+        }) ||
         (params.config?.modelIsolation?.enabled === true &&
           ((params.config?.modelIsolation?.main?.fallbacks?.length ?? 0) > 0 ||
             (params.config?.modelIsolation?.secondary?.fallbacks?.length ?? 0) > 0));
@@ -1300,6 +1301,7 @@ export async function runEmbeddedPiAgent(
 
           const payloads = buildEmbeddedRunPayloads({
             assistantTexts: attempt.assistantTexts,
+            messageHistory: attempt.messagesSnapshot,
             toolMetas: attempt.toolMetas,
             lastAssistant: attempt.lastAssistant,
             lastToolError: attempt.lastToolError,
@@ -1310,6 +1312,8 @@ export async function runEmbeddedPiAgent(
             verboseLevel: params.verboseLevel,
             reasoningLevel: params.reasoningLevel,
             toolResultFormat: resolvedToolResultFormat,
+            messageProvider: params.messageProvider,
+            chatType: params.chatType,
             suppressToolErrorWarnings: params.suppressToolErrorWarnings,
             inlineToolResultsAllowed: false,
             didSendViaMessagingTool: attempt.didSendViaMessagingTool,

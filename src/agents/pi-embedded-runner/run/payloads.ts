@@ -3,7 +3,12 @@ import { parseReplyDirectives } from "../../../auto-reply/reply/reply-directives
 import type { ReasoningLevel, VerboseLevel } from "../../../auto-reply/thinking.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../../../auto-reply/tokens.js";
 import { formatToolAggregate } from "../../../auto-reply/tool-meta.js";
+import { normalizeChatType } from "../../../channels/chat-type.js";
 import type { OpenClawConfig } from "../../../config/config.js";
+import {
+  INTERNAL_MESSAGE_CHANNEL,
+  normalizeMessageChannel,
+} from "../../../utils/message-channel.js";
 import {
   BILLING_ERROR_USER_MESSAGE,
   formatAssistantErrorText,
@@ -52,6 +57,65 @@ function isVerboseToolDetailEnabled(level?: VerboseLevel): boolean {
   return level === "on" || level === "full";
 }
 
+function shouldPreferPostToolFinalAnswer(params: {
+  config?: OpenClawConfig;
+  messageProvider?: string;
+  chatType?: string;
+}): boolean {
+  const defaults = params.config?.agents?.defaults as
+    | {
+        block_deliver?: {
+          block_disable?: unknown;
+          dm_enable?: unknown;
+        };
+      }
+    | undefined;
+  if (defaults?.block_deliver?.block_disable !== true) {
+    return false;
+  }
+  const channel = normalizeMessageChannel(params.messageProvider);
+  if (!channel || channel === INTERNAL_MESSAGE_CHANNEL) {
+    return false;
+  }
+  const dmEnabled = defaults?.block_deliver?.dm_enable === true;
+  if (dmEnabled && normalizeChatType(params.chatType) === "direct") {
+    return false;
+  }
+  return true;
+}
+
+function isToolStopReason(value: unknown): boolean {
+  if (typeof value !== "string") {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === "tooluse" || normalized === "tool_use" || normalized === "tool_calls";
+}
+
+function resolvePostToolAssistantTexts(history: unknown[]): string[] {
+  const assistantHistory = history.filter((entry) => {
+    if (!entry || typeof entry !== "object") {
+      return false;
+    }
+    return (entry as { role?: unknown }).role === "assistant";
+  }) as Array<{ stopReason?: unknown } & AssistantMessage>;
+  if (assistantHistory.length === 0) {
+    return [];
+  }
+  let lastToolUseIndex = -1;
+  for (let i = 0; i < assistantHistory.length; i++) {
+    if (isToolStopReason(assistantHistory[i]?.stopReason)) {
+      lastToolUseIndex = i;
+    }
+  }
+  const start = lastToolUseIndex >= 0 ? lastToolUseIndex + 1 : 0;
+  return assistantHistory
+    .slice(start)
+    .map((message) => extractAssistantText(message))
+    .map((text) => text.trim())
+    .filter(Boolean);
+}
+
 function resolveToolErrorWarningPolicy(params: {
   lastToolError: LastToolError;
   hasUserFacingReply: boolean;
@@ -89,6 +153,7 @@ function resolveToolErrorWarningPolicy(params: {
 
 export function buildEmbeddedRunPayloads(params: {
   assistantTexts: string[];
+  messageHistory?: unknown[];
   toolMetas: ToolMetaEntry[];
   lastAssistant: AssistantMessage | undefined;
   lastToolError?: LastToolError;
@@ -99,6 +164,8 @@ export function buildEmbeddedRunPayloads(params: {
   verboseLevel?: VerboseLevel;
   reasoningLevel?: ReasoningLevel;
   toolResultFormat?: ToolResultFormat;
+  messageProvider?: string;
+  chatType?: string;
   suppressToolErrorWarnings?: boolean;
   inlineToolResultsAllowed: boolean;
   didSendViaMessagingTool?: boolean;
@@ -250,9 +317,23 @@ export function buildEmbeddedRunPayloads(params: {
         ? [fallbackAnswerText]
         : []
   ).filter((text) => !shouldSuppressRawErrorText(text));
+  const scopedAnswerTexts =
+    shouldPreferPostToolFinalAnswer({
+      config: params.config,
+      messageProvider: params.messageProvider,
+      chatType: params.chatType,
+    }) && Array.isArray(params.messageHistory)
+      ? (() => {
+          const postToolTexts = resolvePostToolAssistantTexts(params.messageHistory);
+          if (postToolTexts.length === 0) {
+            return answerTexts;
+          }
+          return postToolTexts.filter((text) => !shouldSuppressRawErrorText(text));
+        })()
+      : answerTexts;
 
   let hasUserFacingAssistantReply = false;
-  for (const text of answerTexts) {
+  for (const text of scopedAnswerTexts) {
     const {
       text: cleanedText,
       mediaUrls,
