@@ -65,6 +65,11 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Before first runtime model selection, isolation branch could incorrectly display fallback state
   - Fix: add `hasRuntimeModel` guard
 
+- **`[Upstream]` `block_deliver.dm_enable` did not apply in Feishu DM (`p2p`) chats** (`src/channels/chat-type.ts` + tests)
+  - Upstream DM normalization recognized `direct`/`dm` only and did not map Feishu `p2p`
+  - Result: with `block_deliver.block_disable=true` and `dm_enable=true`, Feishu DMs were still filtered as non-DM targets
+  - Fix: normalize `p2p -> direct` so the DM exception path works as expected
+
 ### Upstream-Covered (no longer fork-only)
 
 - **HTTP 529 classification in failover path** (`src/agents/failover-error.ts`)
@@ -109,6 +114,7 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
 
 - `block_disable`: when `true`, non-`webchat` targets no longer receive block/stream chunks and only receive final replies.
 - `dm_enable`: when `true` and `block_disable=true`, direct-message chats still receive block/stream chunks.
+  - Feishu note: `p2p` chat type is treated as `direct`.
 
 Behavior summary:
 

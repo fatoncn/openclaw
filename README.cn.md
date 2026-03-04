@@ -25,7 +25,7 @@
   - ASCII art 下方 `✦ Kosbling Edition ✦`，单行 banner `[Kosbling Edition]`
 
 - **CLI `--version` 显示 git commit hash**（`src/cli/program/context.ts`）
-  - `openclaw -v` 输出格式：`2026.2.21-kosbling.4 (34ada4a)`
+  - `openclaw -v` 输出格式：`2026.3.3-kosbling.6 (34ada4a)`
 
 - **更新机制禁用**（`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`）
   - `openclaw update` 提示用 git pull 方式
@@ -34,6 +34,13 @@
 - **System Prompt 注入**（`src/agents/system-prompt.ts`）
   - 所有 agent 的 system prompt 中包含 Kosbling Edition 说明
   - 包括 model isolation 配置参考和定制版行为说明
+
+- **工具抓取路径的全局网络 SSRF 策略**（`src/infra/net/trusted-network-ssrf.ts` + 相关 tools/config）
+  - 新增根级 `network.ssrfPolicy`，作为非浏览器网络工具的默认 SSRF 策略
+  - 当前继承路径：`web_fetch`、`image` 远程 URL 加载、消息附件 URL 抓取
+  - `tools.web.fetch.ssrfPolicy` 仍保留为每工具覆写（优先级高于 `network.ssrfPolicy`）
+  - 兼容旧配置：若未设置 `network.ssrfPolicy`，运行时会回退到 `browser.ssrfPolicy`
+  - 推荐稳态：全局行为用 `network.ssrfPolicy`，浏览器策略保持 browser 作用域内
 
 ### Bug 修复
 
@@ -54,6 +61,11 @@
 - **`[Kosbling]` /status 误报 fallback**（`src/auto-reply/status.ts`）
   - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
   - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
+
+- **`[上游]` `block_deliver.dm_enable` 在飞书私聊（`p2p`）下不生效**（`src/channels/chat-type.ts` + tests）
+  - 上游仅将 `direct`/`dm` 识别为私聊，未把飞书 `p2p` 映射到 `direct`
+  - 导致 `block_deliver.block_disable=true` 且 `dm_enable=true` 时，飞书私聊仍被当成非 DM 进行切割
+  - 修复：补齐 `p2p -> direct` 归一化映射，确保 DM 豁免逻辑按预期生效
 
 ### 已被上游覆盖（不再是 fork 独有）
 
@@ -99,6 +111,7 @@
 
 - `block_disable`: `true` 时，非 `webchat` 目标不再接收 block/stream 分片，只接收最终回复。
 - `dm_enable`: 在 `block_disable=true` 时，`direct` 私聊仍可接收 block/stream 分片。
+  - 飞书补充：`p2p` 会被归一化为 `direct`。
 
 行为：
 

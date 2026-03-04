@@ -1656,12 +1656,37 @@ describe("dispatchReplyFromConfig", () => {
 
     await dispatchReplyFromConfig({ ctx, cfg, dispatcher, replyResolver });
 
-    expect(disableBlockStreamingValue).toBe(false);
+    expect(disableBlockStreamingValue).toBeUndefined();
     expect(dispatcher.sendBlockReply).toHaveBeenCalledWith(
       expect.objectContaining({ text: "dm block" }),
     );
     expect(dispatcher.sendFinalReply).toHaveBeenCalledWith(
       expect.objectContaining({ text: "dm final" }),
     );
+  });
+
+  it("does not force-enable block streaming when no policy or override is set", async () => {
+    setNoAbort();
+    const dispatcher = createDispatcher();
+    const ctx = buildTestCtx({
+      Provider: "feishu",
+      Surface: "feishu",
+      ChatType: "direct",
+      From: "feishu:ou_1",
+      To: "feishu:ou_1",
+    });
+    const cfg = {} as OpenClawConfig;
+    let disableBlockStreamingValue: boolean | undefined;
+    const replyResolver = async (
+      _ctx: MsgContext,
+      opts?: GetReplyOptions,
+    ): Promise<ReplyPayload> => {
+      disableBlockStreamingValue = opts?.disableBlockStreaming;
+      return { text: "final only" };
+    };
+
+    await dispatchReplyFromConfig({ ctx, cfg, dispatcher, replyResolver });
+
+    expect(disableBlockStreamingValue).toBeUndefined();
   });
 });

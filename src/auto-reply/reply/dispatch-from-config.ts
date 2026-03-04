@@ -401,11 +401,18 @@ export async function dispatchReplyFromConfig(params: {
       systemEvent: shouldRouteToOriginating,
     });
 
+    // Preserve caller/default semantics unless policy explicitly forces block streaming off.
+    // Using `||` here incorrectly coerces `undefined` into `false`, which in turn
+    // force-enables block streaming in downstream directive resolution.
+    const disableBlockStreaming = disableBlocksByPolicy
+      ? true
+      : params.replyOptions?.disableBlockStreaming;
+
     const replyResult = await (params.replyResolver ?? getReplyFromConfig)(
       ctx,
       {
         ...params.replyOptions,
-        disableBlockStreaming: params.replyOptions?.disableBlockStreaming || disableBlocksByPolicy,
+        disableBlockStreaming,
         typingPolicy: typing.typingPolicy,
         suppressTyping: typing.suppressTyping,
         onToolResult: (payload: ReplyPayload) => {
