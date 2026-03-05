@@ -513,6 +513,47 @@ describe("agentCommand", () => {
     });
   });
 
+  it("uses stored session model override under model isolation when override is group-allowed", async () => {
+    await withTempHome(async (home) => {
+      const store = path.join(home, "sessions.json");
+      writeSessionStoreSeed(store, {
+        "agent:main:subagent:isolation-allowed": {
+          sessionId: "session-isolation-allowed",
+          updatedAt: Date.now(),
+          providerOverride: "babelark",
+          modelOverride: "GLM-5",
+        },
+      });
+
+      configSpy.mockReturnValue({
+        agents: {
+          defaults: {
+            model: { primary: "anthropic/claude-opus-4-5" },
+            models: {
+              "anthropic/claude-opus-4-5": {},
+              "babelark/GLM-5": { alias: "glm-babelark" },
+              "babelark/MiniMax-M2.5": { alias: "minimax-babelark" },
+            },
+            workspace: path.join(home, "openclaw"),
+          },
+        },
+        session: { store, mainKey: "main" },
+        modelIsolation: {
+          enabled: true,
+          main: { model: "anthropic/claude-opus-4-5" },
+          secondary: {
+            model: "minimax-babelark",
+            fallbacks: ["glm-babelark"],
+          },
+        },
+      } as OpenClawConfig);
+
+      await runAgentWithSessionKey("agent:main:subagent:isolation-allowed");
+
+      expectLastRunProviderModel("babelark", "GLM-5");
+    });
+  });
+
   it("keeps stored session model override when models allowlist is empty", async () => {
     await withTempHome(async (home) => {
       const store = path.join(home, "sessions.json");

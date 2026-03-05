@@ -19,7 +19,10 @@ import { resolveBootstrapWarningSignaturesSeen } from "../agents/bootstrap-budge
 import { runCliAgent } from "../agents/cli-runner.js";
 import { getCliSessionId, setCliSessionId } from "../agents/cli-session.js";
 import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
-import { resolveIsolationAwareModelSelection } from "../agents/edition-isolation.js";
+import {
+  normalizeIsolationModelRef,
+  resolveIsolationAwareModelSelection,
+} from "../agents/edition-isolation.js";
 import { FailoverError } from "../agents/failover-error.js";
 import { formatAgentInternalEventsForPrompt } from "../agents/internal-events.js";
 import { AGENT_LANE_SUBAGENT } from "../agents/lanes.js";
@@ -745,11 +748,23 @@ async function agentCommandInternal(
       }
     }
 
-    const storedProviderOverride = isolationEnabled
-      ? undefined
-      : sessionEntry?.providerOverride?.trim();
-    const storedModelOverride = isolationEnabled ? undefined : sessionEntry?.modelOverride?.trim();
-    if (!isolationEnabled && storedModelOverride) {
+    const storedProviderOverride = sessionEntry?.providerOverride?.trim();
+    const storedModelOverride = sessionEntry?.modelOverride?.trim();
+    if (isolationEnabled && storedModelOverride) {
+      const rawIsolationOverride = storedProviderOverride
+        ? `${storedProviderOverride}/${storedModelOverride}`
+        : storedModelOverride;
+      const normalized = normalizeIsolationModelRef({
+        cfg,
+        sessionKey,
+        raw: rawIsolationOverride,
+        agentId: sessionAgentId,
+      });
+      if (normalized?.ok) {
+        provider = normalized.provider;
+        model = normalized.model;
+      }
+    } else if (!isolationEnabled && storedModelOverride) {
       const candidateProvider = storedProviderOverride || defaultProvider;
       const normalizedStored = normalizeModelRef(candidateProvider, storedModelOverride);
       const key = modelKey(normalizedStored.provider, normalizedStored.model);
