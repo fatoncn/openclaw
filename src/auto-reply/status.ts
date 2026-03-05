@@ -655,18 +655,13 @@ export function buildStatusMessage(args: StatusArgs): string {
     ? resolveEditionIsolationParams(args.config, args.sessionKey, args.agentId)
     : null;
 
-  // If edition isolation is active, use edition's effective provider/model for display
-  const displaySelectedModelLabel = editionParams
-    ? formatProviderModelRef(editionParams.provider, editionParams.model) || "unknown"
-    : modelRefs.selected.label || "unknown";
+  // Keep model line tied to current session selection (including session /model overrides).
+  // Edition baseline is shown separately on the "Edition" line below.
+  const selectedModelLabel = modelRefs.selected.label || "unknown";
   // KOSBLING-PATCH end
-
-  const selectedModelLabel = displaySelectedModelLabel;
   const activeModelLabel = formatProviderModelRef(activeProvider, activeModel) || "unknown";
   const fallbackState = resolveActiveFallbackState({
-    selectedModelRef: editionParams
-      ? displaySelectedModelLabel
-      : modelRefs.selected.label || "unknown",
+    selectedModelRef: modelRefs.selected.label || "unknown",
     activeModelRef: activeModelLabel,
     state: entry,
   });
@@ -695,6 +690,10 @@ export function buildStatusMessage(args: StatusArgs): string {
   const costLabel = showCost && hasUsage ? formatUsd(cost) : undefined;
 
   const selectedAuthLabel = selectedAuthLabelValue ? ` · 🔑 ${selectedAuthLabelValue}` : "";
+  const sessionModelOverrideNote =
+    entry?.modelOverride?.trim() || entry?.providerOverride?.trim()
+      ? "session override"
+      : undefined;
   const channelModelNote = (() => {
     // KOSBLING-PATCH: skip channel override note when edition isolation is active
     if (editionParams) {
@@ -738,7 +737,8 @@ export function buildStatusMessage(args: StatusArgs): string {
     }
     return "channel override";
   })();
-  const modelNote = channelModelNote ? ` · ${channelModelNote}` : "";
+  const modelNoteText = [sessionModelOverrideNote, channelModelNote].filter(Boolean).join(" · ");
+  const modelNote = modelNoteText ? ` · ${modelNoteText}` : "";
   const modelLine = `🧠 Model: ${selectedModelLabel}${selectedAuthLabel}${modelNote}`;
   const showFallbackAuth = activeAuthLabelValue && activeAuthLabelValue !== selectedAuthLabelValue;
   // KOSBLING-PATCH: when edition isolation is active, show edition fallbacks instead of active fallback

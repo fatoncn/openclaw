@@ -384,6 +384,35 @@ describe("buildStatusMessage", () => {
     expect(normalized).toContain("Queue: collect");
   });
 
+  it("shows session-selected model while keeping edition baseline line", () => {
+    const text = buildStatusMessage({
+      config: {
+        modelIsolation: {
+          enabled: true,
+          main: { model: "google/gemini-3.1-pro-preview", fallbacks: ["babelark/claude-opus-4-6"] },
+          secondary: { model: "babelark/MiniMax-M2.5" },
+        },
+      } as unknown as OpenClawConfig,
+      agent: {
+        model: "google/gemini-3.1-pro-preview",
+      },
+      sessionEntry: {
+        sessionId: "iso-1",
+        updatedAt: 0,
+        providerOverride: "babelark",
+        modelOverride: "claude-opus-4-6",
+      },
+      sessionKey: "agent:main:main",
+      sessionScope: "per-sender",
+      queue: { mode: "collect", depth: 0 },
+      modelAuth: "api-key",
+    });
+
+    const normalized = normalizeTestText(text);
+    expect(normalized).toContain("Model: babelark/claude-opus-4-6");
+    expect(normalized).toContain("Edition: main group · google/gemini-3.1-pro-preview");
+  });
+
   it("includes group activation for group sessions", () => {
     const text = buildStatusMessage({
       agent: {},
