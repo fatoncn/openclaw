@@ -138,6 +138,42 @@ describe("openclaw-tools: subagents (sessions_spawn model + thinking)", () => {
     });
   });
 
+  it("sessions_spawn preserves explicit model override when isolation is enabled", async () => {
+    const calls: GatewayCall[] = [];
+    mockPatchAndSingleAgentRun({ calls, runId: "run-isolation-explicit-model" });
+
+    setSessionsSpawnConfigOverride({
+      session: { mainKey: "main", scope: "per-sender" },
+      modelIsolation: {
+        enabled: true,
+        main: { model: "google/gemini-3.1-pro-preview" },
+        secondary: { model: "minimax/MiniMax-M2.5", fallbacks: ["babelark/GLM-5"] },
+      },
+    } as SessionsSpawnConfigOverride);
+
+    const tool = await getSessionsSpawnTool({
+      agentSessionKey: "discord:group:req",
+      agentChannel: "discord",
+    });
+
+    const result = await tool.execute("call-isolation-explicit-model", {
+      task: "do thing",
+      model: "babelark/GLM-5",
+    });
+    expect(result.details).toMatchObject({
+      status: "accepted",
+      modelApplied: true,
+    });
+
+    const patchCall = calls.find(
+      (call) => call.method === "sessions.patch" && (call.params as { model?: string })?.model,
+    );
+    expect(patchCall?.params).toMatchObject({
+      key: expect.stringContaining("subagent:"),
+      model: "babelark/GLM-5",
+    });
+  });
+
   it("sessions_spawn forwards thinking overrides to the agent run", async () => {
     const calls: Array<{ method?: string; params?: unknown }> = [];
 
