@@ -185,6 +185,8 @@ git push origin main         # 推送
 
 例如：`2026.3.3-kosbling.6`
 
+中文变更日志：[`CHANGELOG.cn.md`](./CHANGELOG.cn.md)
+
 版本号维护在仓库根目录的 `VERSION` 文件中，`build-and-link.sh` 构建时自动读取并写入 `package.json`。
 
 ### 发版流程
