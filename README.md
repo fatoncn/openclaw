@@ -6,7 +6,7 @@ A customized fork of [OpenClaw](https://github.com/openclaw/openclaw) for the [K
 
 - Upstream repository: `https://github.com/openclaw/openclaw.git`
 - Sync strategy: `git merge --no-ff` (preserve merge history)
-- Current baseline: `upstream/main` (synced 2026-03-04, includes `v2026.3.2`)
+- Current baseline: `upstream/main` (synced 2026-03-09, includes `v2026.3.8`)
 
 ## Custom Changes
 
@@ -74,8 +74,10 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
 
 ### Upstream-Covered (no longer fork-only)
 
+- **Models merge-mode provider baseUrl precedence + api drift refresh** (`src/agents/models-config.ts`)
+  - Fork-specific merge/baseUrl preservation patches were removed; behavior now follows upstream `planOpenClawModelsJson` flow and upstream test coverage.
 - **HTTP 529 classification in failover path** (`src/agents/failover-error.ts`)
-  - Fork behavior switched back to upstream-compatible handling (`529 -> rate_limit`).
+  - Fork-specific HTTP status mapping patch was removed; behavior now uses upstream shared classifier (`classifyFailoverReasonFromHttpStatus`), including `529 -> rate_limit`.
 - **Gateway supervised restart guardrails** (`src/infra/process-respawn.ts`)
   - The current implementation now comes from upstream and includes supervised-env markers + launchd kickstart flow.
 
