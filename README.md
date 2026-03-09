@@ -1,5 +1,7 @@
 # OpenClaw — Kosbling Edition
 
+English (default) | [简体中文](README.zh-CN.md)
+
 A customized fork of [OpenClaw](https://github.com/openclaw/openclaw) for the [Kosbling AI Studio](https://kosbling.ai) e-commerce assistant platform.
 
 ## Upstream Relationship

@@ -1,5 +1,7 @@
 # Changelog
 
+English (default) | [简体中文](CHANGELOG.zh-CN.md)
+
 Docs: https://docs.openclaw.ai
 
 ## Unreleased
