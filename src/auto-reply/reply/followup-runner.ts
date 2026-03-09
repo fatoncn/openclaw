@@ -10,6 +10,7 @@ import { logVerbose } from "../../globals.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js"; // KOSBLING-PATCH
 import { defaultRuntime } from "../../runtime.js";
+import { isInternalMessageChannel } from "../../utils/message-channel.js";
 import { stripHeartbeatToken } from "../heartbeat.js";
 import type { OriginatingChannelType } from "../templating.js";
 import { isSilentReplyText, SILENT_REPLY_TOKEN } from "../tokens.js";
@@ -131,10 +132,17 @@ export function createFollowupRunner(params: {
   return async (queued: FollowupRun) => {
     try {
       const runId = crypto.randomUUID();
+      const shouldSurfaceToControlUi = isInternalMessageChannel(
+        resolveOriginMessageProvider({
+          originatingChannel: queued.originatingChannel,
+          provider: queued.run.messageProvider,
+        }),
+      );
       if (queued.run.sessionKey) {
         registerAgentRunContext(runId, {
           sessionKey: queued.run.sessionKey,
           verboseLevel: queued.run.verboseLevel,
+          isControlUiVisible: shouldSurfaceToControlUi,
         });
       }
       let autoCompactionCompleted = false;
@@ -149,7 +157,7 @@ export function createFollowupRunner(params: {
       try {
         const fallbackResult = await runWithModelFallback({
           ...resolveModelFallbackOptions(queued.run), // KOSBLING-PATCH
-          run: async (provider, model) => {
+          run: async (provider, model, runOptions) => {
             const authProfile = resolveRunAuthProfile(queued.run, provider);
             const result = await runEmbeddedPiAgent({
               sessionId: queued.run.sessionId,
@@ -192,6 +200,7 @@ export function createFollowupRunner(params: {
               bashElevated: queued.run.bashElevated,
               timeoutMs: queued.run.timeoutMs,
               runId,
+              allowTransientCooldownProbe: runOptions?.allowTransientCooldownProbe,
               blockReplyBreak: queued.run.blockReplyBreak,
               bootstrapPromptWarningSignaturesSeen,
               bootstrapPromptWarningSignature:

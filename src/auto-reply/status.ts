@@ -767,7 +767,7 @@ export function buildStatusMessage(args: StatusArgs): string {
       : null;
   })();
   // KOSBLING-PATCH end
-  const commit = resolveCommitHash();
+  const commit = resolveCommitHash({ moduleUrl: import.meta.url });
   const versionLine = `🦞 OpenClaw ${VERSION}${commit ? ` (${commit})` : ""}`;
   const usagePair = formatUsagePair(inputTokens, outputTokens);
   const cacheLine = formatCacheLine(inputTokens, cacheRead, cacheWrite);
