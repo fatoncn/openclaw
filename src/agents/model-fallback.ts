@@ -590,7 +590,7 @@ export async function runWithModelFallback<T>(params: {
         code: described.code,
       });
       // KOSBLING-PATCH: emit fallback-attempt diagnostics at info level so they show in gateway.log (stdout)
-      modelFallbackLog.info(
+      log.info(
         `attempt ${i + 1}/${candidates.length} failed: ${candidate.provider}/${candidate.model}: ${described.message}`,
       );
       await params.onError?.({

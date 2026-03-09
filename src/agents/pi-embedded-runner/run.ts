@@ -1294,6 +1294,8 @@ export async function runEmbeddedPiAgent(
           const authFailure = isAuthAssistantError(lastAssistant);
           const rateLimitFailure = isRateLimitAssistantError(lastAssistant);
           const billingFailure = isBillingAssistantError(lastAssistant);
+          const assistantErrorForClassification =
+            lastAssistant?.errorMessage?.trim() || assistantErrorText || "";
           const assistantFailoverReason =
             classifyFailoverReason(lastAssistant?.errorMessage ?? "") ??
             classifyFailoverReason(assistantErrorText ?? "");

@@ -36,6 +36,7 @@
 - When you touch docs, end the reply with the `https://docs.openclaw.ai/...` URLs you referenced.
 - README (GitHub): keep absolute docs URLs (`https://docs.openclaw.ai/...`) so links work on GitHub.
 - Docs content must be generic: no personal device names/hostnames/paths; use placeholders like `user@gateway-host` and “gateway host”.
+- Root docs i18n (GitHub): root Chinese docs use `*.zh-CN.md` naming (not `*.cn.md`); keep `README.md`/`CHANGELOG.md` as default English sources and maintain top language switch links in both directions.
 
 ## Docs i18n (zh-CN)
 

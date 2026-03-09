@@ -1,29 +1,265 @@
-# OpenClaw — Kosbling Edition（简体中文）
+# OpenClaw — Kosbling Edition
 
 [English (default)](README.md) | 简体中文
 
-本文件是根目录 README 的中文版本入口。英文版 `README.md` 为默认与权威来源。
+基于 [OpenClaw](https://github.com/openclaw/openclaw) 的定制 fork，用于 [Kosbling AI Studio](https://kosbling.ai) 电商助手平台。
 
-## 仓库定位
+## 与上游的关系
 
-这是基于 [OpenClaw](https://github.com/openclaw/openclaw) 的定制 fork，用于 Kosbling AI Studio 场景。
+- 上游仓库：`https://github.com/openclaw/openclaw.git`
+- 同步方式：`git merge --no-ff` 保留合并记录
+- 当前基线：`upstream/main`（2026-03-09 已同步，包含 `v2026.3.8`）
 
-## 阅读建议
+## 定制改动
 
-为避免中英文长期漂移，建议按下面顺序阅读：
+所有改动在源码中标记 `// KOSBLING-PATCH`。
 
-1. 先读英文版：`README.md`（默认、最新、最完整）
-2. 再看本文件中的中文补充与导航
+### 功能改造
 
-## 常用入口
+- **Model 隔离**（`src/agents/edition-isolation.ts` + 多个文件）
+  - 根级 `modelIsolation` 配置块，main/secondary 两组完全隔离
+  - `/model` 命令、cron payload、spawn 显式指定全部封死
+  - 支持 per-agent model override（必须在组 allowlist 内）
+  - 详见下方 [Model 隔离](#model-隔离) 章节
+  - 已向官方提交 [Feature Proposal](https://github.com/openclaw/openclaw/discussions/28314)
 
-- 英文主文档（默认）：[README.md](README.md)
-- 变更日志（英文主）：[CHANGELOG.md](CHANGELOG.md)
-- 变更日志（中文）：[CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)
-- 官方文档站：[https://docs.openclaw.ai](https://docs.openclaw.ai)
+- **CLI Banner 品牌标识**（`src/cli/banner.ts`）
+  - ASCII art 下方 `✦ Kosbling Edition ✦`，单行 banner `[Kosbling Edition]`
 
-## 维护规则
+- **CLI `--version` 显示 git commit hash**（`src/cli/program/context.ts`）
+  - `openclaw -v` 输出格式：`2026.3.3-kosbling.6 (34ada4a)`
 
-- 英文优先：所有改动先更新 `README.md`。
-- 中文同步：按需同步核心信息到本文件；如有冲突，以英文版为准。
-- 语言标识：根目录统一使用 `*.zh-CN.md` 命名，不再使用 `*.cn.md`。
+- **更新机制禁用**（`src/infra/update-startup.ts` + `src/cli/update-cli/update-command.ts` + `src/config/io.ts`）
+  - `openclaw update` 提示用 git pull 方式
+  - 启动时 update check 和 config version warning 跳过
+
+- **System Prompt 注入**（`src/agents/system-prompt.ts`）
+  - 所有 agent 的 system prompt 中包含 Kosbling Edition 说明
+  - 包括 model isolation 配置参考和定制版行为说明
+
+- **工具抓取路径的全局网络 SSRF 策略**（`src/infra/net/trusted-network-ssrf.ts` + 相关 tools/config）
+  - 新增根级 `network.ssrfPolicy`，作为非浏览器网络工具的默认 SSRF 策略
+  - 当前继承路径：`web_fetch`、`image` 远程 URL 加载、消息附件 URL 抓取
+  - `tools.web.fetch.ssrfPolicy` 仍保留为每工具覆写（优先级高于 `network.ssrfPolicy`）
+  - 兼容旧配置：若未设置 `network.ssrfPolicy`，运行时会回退到 `browser.ssrfPolicy`
+  - 推荐稳态：全局行为用 `network.ssrfPolicy`，浏览器策略保持 browser 作用域内
+
+### Bug 修复
+
+> 标注 `[上游]` 的是官方代码的 bug，`[Kosbling]` 的是我们改造引入需要配套的修复。
+
+- **`[上游]` HTTP provider 错误（401/403/503 等）不触发 model fallback**（`src/agents/pi-embedded-runner/run.ts`）
+  - provider 返回 HTTP 错误时，错误以 `lastAssistant.stopReason="error"` 形式返回，被包装为 `isError=true` payload，不抛异常，`runWithModelFallback` 的 catch 永远捕获不到
+  - 修复：在 while 循环中检测 `stopReason="error"` 的 assistant 消息，用 `coerceToFailoverError` 分类后抛出 `FailoverError`
+
+- **`[上游]` model-fallback 日志不可见**（`src/agents/model-fallback.ts`）
+  - fallback 尝试时无任何日志输出，难以诊断
+  - 修复：添加 info-level 日志，fallback attempt 信息输出到 `gateway.log`（stdout）
+
+- **`[Kosbling]` `fallbackConfigured` 不检查 `modelIsolation` fallbacks**（`src/agents/pi-embedded-runner/run.ts`）
+  - 上游 `fallbackConfigured` 只检查 `agents.defaults.model.fallbacks`，不检查 `modelIsolation` 配置的 fallbacks，导致所有 failover 检查被跳过
+  - 修复：扩展 `fallbackConfigured` 同时检查 `modelIsolation.enabled` + `main/secondary.fallbacks`
+
+- **`[Kosbling]` /status 误报 fallback**（`src/auto-reply/status.ts`）
+  - session 首次请求前，edition isolation 分支会错误显示 fallback 状态
+  - 修复：加 `hasRuntimeModel` 检查，无运行时 model 时不显示 fallback
+
+- **`[上游]` `block_deliver.dm_enable` 在飞书私聊（`p2p`）下不生效**（`src/channels/chat-type.ts` + tests）
+  - 上游仅将 `direct`/`dm` 识别为私聊，未把飞书 `p2p` 映射到 `direct`
+  - 导致 `block_deliver.block_disable=true` 且 `dm_enable=true` 时，飞书私聊仍被当成非 DM 进行切割
+  - 修复：补齐 `p2p -> direct` 归一化映射，确保 DM 豁免逻辑按预期生效
+- **`[上游]` provider 瞬态 INTERNAL 错误按可重试 timeout 分类**（`src/agents/pi-embedded-helpers/failover-matches.ts`）
+  - `got status: INTERNAL` 和 `{"status":"INTERNAL","code":500}` 这类返回会归类为可重试的 timeout 风格 failover 错误。
+
+### 已被上游覆盖（不再是 fork 独有）
+
+- **Models merge 模式下 provider baseUrl 优先级与 api 变化刷新**（`src/agents/models-config.ts`）
+  - 旧的 fork 合并/baseUrl 保留补丁已移除，当前统一走上游 `planOpenClawModelsJson` 流程与上游测试覆盖。
+- **HTTP 529 failover 分类**（`src/agents/failover-error.ts`）
+  - 旧的 fork 状态码映射补丁已移除，当前统一走上游 `classifyFailoverReasonFromHttpStatus`（含 `529 -> rate_limit`）。
+- **Gateway 受管重启与孤儿进程防护**（`src/infra/process-respawn.ts`）
+  - 当前实现来自上游，包含 supervisor marker 识别和 launchd kickstart 逻辑。
+
+### Model 隔离
+
+`openclaw.json` 配置：
+
+```json
+{
+  "modelIsolation": {
+    "enabled": true,
+    "main": {
+      "model": "anthropic/claude-opus-4-6",
+      "fallbacks": ["anthropic/claude-sonnet-4-6"]
+    },
+    "secondary": {
+      "model": "anthropic/claude-sonnet-4-6",
+      "fallbacks": ["anthropic/claude-haiku-3-5"]
+    }
+  }
+}
+```
+
+### Block 投递策略（新增）
+
+```json5
+{
+  agents: {
+    defaults: {
+      block_deliver: {
+        block_disable: true, // 对非 webchat 的 channel-target 禁用 block 投递
+        dm_enable: true, // block_disable 开启时，私聊仍允许 block 投递
+      },
+    },
+  },
+}
+```
+
+- `block_disable`: `true` 时，非 `webchat` 目标不再接收 block/stream 分片，只接收最终回复。
+- `dm_enable`: 在 `block_disable=true` 时，`direct` 私聊仍可接收 block/stream 分片。
+  - 飞书补充：`p2p` 会被归一化为 `direct`。
+
+行为：
+
+- `enabled: false` 或不存在 → 走官方原版逻辑，零影响
+- `enabled: true` → main 组用于主 agent 对话（DM/群聊/TUI/webchat），secondary 组用于 cron/subagent
+- 两组完全隔离，fallback 不穿透，全挂则报错
+- `/model` 命令被拦截，spawn/cron 的 model 指定被拒绝并返回错误信息
+- 会话级 `/model` 覆写会持久化；在 `modelIsolation` 下，请求模型会被归一化到当前组 allowlist。
+- `/status` 会显示会话级 model override，同时保留 Edition 行上的组基线。
+
+关于自定义 provider merge 行为（`openclaw.json` vs 每 agent 的 `models.json`），参见 [Models registry](https://docs.openclaw.ai/concepts/models#models-registry-modelsjson)。
+模型/fallback 漂移后如需重置 token-window 缓存，可运行：`openclaw sessions cleanup --enforce --clear-context-tokens`（可选追加 `--clear-total-tokens-fresh`）。
+
+### Model 隔离 token 护栏（main 组）
+
+`modelIsolation.main.tokenGuardrail` 可为 main 组会话增加按 agent 维度的 token 护栏。
+当该 agent 的 main 组会话在配置时间窗口内的加权 token 使用量超过阈值时，会暂停该 agent 的 main 组运行，直到你手动关闭该护栏。
+
+```json5
+{
+  modelIsolation: {
+    enabled: true,
+    main: {
+      tokenGuardrail: {
+        enabled: true,
+        windowMinutes: 5,
+        maxTokens: 20000,
+      },
+    },
+  },
+}
+```
+
+当前加权口径：
+
+- `input * 1`
+- `cacheRead * 0.1`
+- `cacheWrite * 1.2`
+- `output * 5`
+
+按 agent 关闭护栏：
+
+```bash
+openclaw agents isolation-guardrail disable --agent <agent-id>
+```
+
+### 配置迁移
+
+旧配置路径 `edition.modelIsolation` 和 `kosbling.modelIsolation` 会在启动时自动迁移到根级 `modelIsolation`。
+
+## 开发规范
+
+### 改动记录
+
+所有改动必须同步更新本 README：
+
+- **功能改造** → 记录在「功能改造」区
+- **Bug 修复** → 记录在「Bug 修复」区
+- 如涉及上游 bug，附上相关 issue 链接
+
+### 功能改动必须同步 System Prompt
+
+任何功能改动都必须考虑是否需要更新 `src/agents/system-prompt.ts` 中的 Kosbling Edition section。
+
+### 代码标记
+
+所有定制改动必须加 `// KOSBLING-PATCH` 注释，便于 upstream 同步时识别冲突。
+
+## 安装
+
+### 前置条件
+
+- Node.js 22+
+- pnpm
+
+### 首次安装（目标机器）
+
+```bash
+git clone https://github.com/kosbling-ai/openclaw.git ~/.openclaw-kosbling
+cd ~/.openclaw-kosbling
+./build-and-link.sh
+```
+
+### 更新
+
+```bash
+cd ~/.openclaw-kosbling
+git pull
+./build-and-link.sh
+```
+
+### 开发机
+
+在 fork 源码目录运行 `./build-and-link.sh` 只会构建，不会注册全局 CLI（避免与运行仓库冲突）。
+
+改完代码后：
+
+```bash
+./build-and-link.sh          # 仅构建，验证编译通过
+git add -A && git commit     # 提交
+git push origin main         # 推送
+```
+
+然后在运行仓库（`~/.openclaw-kosbling`）pull + build 部署。
+
+## 版本管理
+
+版本格式：`{upstream_version}-kosbling.{patch}`
+
+例如：`2026.3.3-kosbling.6`
+
+中文变更日志：[`CHANGELOG.zh-CN.md`](./CHANGELOG.zh-CN.md)
+
+版本号维护在仓库根目录的 `VERSION` 文件中，`build-and-link.sh` 构建时自动读取并写入 `package.json`。
+
+### 发版流程
+
+```bash
+# 1. 更新 VERSION 文件
+echo "2026.3.3-kosbling.6" > VERSION
+
+# 2. 提交推送
+git add -A && git commit -m "release: v2026.3.3-kosbling.6"
+git push origin main
+```
+
+## 同步上游
+
+```bash
+git fetch upstream
+git checkout upstream
+git merge v2026.2.xx
+git checkout main
+git merge upstream --no-ff -m "Merge upstream v2026.2.xx"
+git push origin main upstream
+```
+
+## 分支说明
+
+- `main` — 主开发分支，包含所有 Kosbling Edition 定制
+- `upstream` — 跟踪上游 OpenClaw，用于同步合并
+
+## 许可证
+
+沿用上游 OpenClaw 许可证。
