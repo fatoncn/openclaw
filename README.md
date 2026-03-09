@@ -328,6 +328,7 @@ Minimal `~/.openclaw/openclaw.json` (model + defaults):
 ```
 
 [Full configuration reference (all keys + examples).](https://docs.openclaw.ai/gateway/configuration)
+For custom provider merge behavior (`openclaw.json` vs per-agent `models.json`), see [Models registry](https://docs.openclaw.ai/concepts/models#models-registry-modelsjson).
 
 ## Security model (important)
 
