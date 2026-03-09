@@ -46,6 +46,8 @@ Model note: while many providers/models are supported, for the best experience a
 
 - Models config + CLI: [Models](https://docs.openclaw.ai/concepts/models)
 - Auth profile rotation (OAuth vs API keys) + fallbacks: [Model failover](https://docs.openclaw.ai/concepts/model-failover)
+- Session model overrides (`/model`) are persisted per session. Under `modelIsolation`, requested models are normalized to the active group allowlist; `/status` shows session-specific overrides and keeps the group baseline on the `Edition` line.
+- Session token-window cache reset (for model/fallback drift): run `openclaw sessions cleanup --enforce --clear-context-tokens` (optional: add `--clear-total-tokens-fresh`). Reference: [sessions CLI](https://docs.openclaw.ai/cli/sessions).
 
 ## Install (recommended)
 
@@ -330,6 +332,41 @@ Minimal `~/.openclaw/openclaw.json` (model + defaults):
 [Full configuration reference (all keys + examples).](https://docs.openclaw.ai/gateway/configuration)
 For custom provider merge behavior (`openclaw.json` vs per-agent `models.json`), see [Models registry](https://docs.openclaw.ai/concepts/models#models-registry-modelsjson).
 
+### Model isolation token guardrail (main group)
+
+`modelIsolation.main.tokenGuardrail` adds a per-agent guardrail for main-group sessions.
+If weighted token usage across that agent's main-group sessions exceeds the configured
+window threshold, main-group runs are paused for that agent until you manually disable
+the guardrail (WebChat: `Agents -> Isolation Guardrail`, or CLI command below).
+
+```json5
+{
+  modelIsolation: {
+    enabled: true,
+    main: {
+      tokenGuardrail: {
+        enabled: true,
+        windowMinutes: 5,
+        maxTokens: 20000,
+      },
+    },
+  },
+}
+```
+
+Current weighted accounting:
+
+- `input * 1`
+- `cacheRead * 0.1`
+- `cacheWrite * 1.2`
+- `output * 5`
+
+Disable for a specific agent:
+
+```bash
+openclaw agents isolation-guardrail disable --agent <agent-id>
+```
+
 ## Security model (important)
 
 - **Default:** tools run on the host for the **main** session, so the agent has full access when it’s just you.
@@ -442,6 +479,7 @@ Use these when you’re past the onboarding flow and want the deeper reference.
 
 ## Operations & troubleshooting
 
+- Provider transient error classification note: `got status: INTERNAL` and JSON payloads like `{"status":"INTERNAL","code":500}` are treated as retryable `timeout` failover errors.
 - [Health checks](https://docs.openclaw.ai/gateway/health)
 - [Gateway lock](https://docs.openclaw.ai/gateway/gateway-lock)
 - [Background process](https://docs.openclaw.ai/gateway/background-process)

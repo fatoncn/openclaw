@@ -6,9 +6,14 @@ Docs: https://docs.openclaw.ai
 
 ### Changes
 
+- CLI/sessions cleanup: add `--clear-context-tokens` to clear cached per-session context window values, plus optional `--clear-total-tokens-fresh` to mark cached token utilization snapshots stale until the next run refreshes usage.
+- Model isolation/main guardrail: add per-agent main-group token guardrails with persistent trigger state, channel error notice delivery on trigger, WebChat visibility (`Agents -> Isolation Guardrail` + chat-menu trigger badge), and manual reset controls in both WebChat and CLI (`openclaw agents isolation-guardrail disable --agent <id>`). Guardrail usage now uses weighted accounting: `input*1 + cacheRead*0.1 + cacheWrite*1.2 + output*5`.
+
 ### Breaking
 
 ### Fixes
+
+- Models/isolation status + normalization: keep `/status` model display aligned with session-level `/model` overrides (with a session override marker) while preserving the group baseline on the Edition line, and ensure isolation-aware runtime/session paths consistently apply group normalization for stored overrides and spawn-specified models.
 
 ## 2026.3.8
 
