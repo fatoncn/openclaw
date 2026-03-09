@@ -55,6 +55,8 @@ openclaw sessions cleanup --agent work --dry-run
 openclaw sessions cleanup --all-agents --dry-run
 openclaw sessions cleanup --enforce
 openclaw sessions cleanup --enforce --active-key "agent:main:telegram:dm:123"
+openclaw sessions cleanup --enforce --clear-context-tokens
+openclaw sessions cleanup --enforce --clear-context-tokens --clear-total-tokens-fresh
 openclaw sessions cleanup --json
 ```
 
@@ -66,6 +68,8 @@ openclaw sessions cleanup --json
   - In text mode, dry-run prints a per-session action table (`Action`, `Key`, `Age`, `Model`, `Flags`) so you can see what would be kept vs removed.
 - `--enforce`: apply maintenance even when `session.maintenance.mode` is `warn`.
 - `--active-key <key>`: protect a specific active key from disk-budget eviction.
+- `--clear-context-tokens`: clear per-session `contextTokens` cache so window size re-resolves from current model/config.
+- `--clear-total-tokens-fresh`: mark cached `totalTokens` snapshots stale (`totalTokensFresh=false`) to avoid misleading utilization until the next run updates usage.
 - `--agent <id>`: run cleanup for one configured agent store.
 - `--all-agents`: run cleanup for all configured agent stores.
 - `--store <path>`: run against a specific `sessions.json` file.
@@ -84,6 +88,8 @@ openclaw sessions cleanup --json
       "storePath": "/home/user/.openclaw/agents/main/sessions/sessions.json",
       "beforeCount": 120,
       "afterCount": 80,
+      "clearedContextTokens": 12,
+      "clearedTotalTokensFresh": 9,
       "pruned": 40,
       "capped": 0
     },
@@ -92,6 +98,8 @@ openclaw sessions cleanup --json
       "storePath": "/home/user/.openclaw/agents/work/sessions/sessions.json",
       "beforeCount": 18,
       "afterCount": 18,
+      "clearedContextTokens": 0,
+      "clearedTotalTokensFresh": 0,
       "pruned": 0,
       "capped": 0
     }
