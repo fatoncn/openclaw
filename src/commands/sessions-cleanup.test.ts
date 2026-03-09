@@ -241,6 +241,108 @@ describe("sessionsCleanupCommand", () => {
     expect(payload.missing).toBe(1);
   });
 
+  it("reports context token cache clears in dry-run JSON", async () => {
+    mocks.enforceSessionDiskBudget.mockResolvedValue(null);
+    mocks.loadSessionStore.mockReturnValue({
+      s1: {
+        sessionId: "s1",
+        updatedAt: 1,
+        totalTokens: 1234,
+        totalTokensFresh: true,
+        contextTokens: 200_000,
+      },
+      s2: {
+        sessionId: "s2",
+        updatedAt: 2,
+        totalTokens: 5678,
+      },
+      s3: {
+        sessionId: "s3",
+        updatedAt: 3,
+        totalTokensFresh: false,
+      },
+    });
+
+    const { runtime, logs } = makeRuntime();
+    await sessionsCleanupCommand(
+      {
+        json: true,
+        dryRun: true,
+        clearContextTokens: true,
+        clearTotalTokensFresh: true,
+      },
+      runtime,
+    );
+
+    expect(logs).toHaveLength(1);
+    const payload = JSON.parse(logs[0] ?? "{}") as Record<string, unknown>;
+    expect(payload.clearedContextTokens).toBe(1);
+    expect(payload.clearedTotalTokensFresh).toBe(2);
+  });
+
+  it("applies context token cache clears during enforce", async () => {
+    mocks.enforceSessionDiskBudget.mockResolvedValue(null);
+    mocks.updateSessionStore.mockImplementation(
+      async (
+        _storePath: string,
+        mutator: (store: Record<string, SessionEntry>) => Promise<void> | void,
+        opts?: {
+          onMaintenanceApplied?: (report: {
+            mode: "warn" | "enforce";
+            beforeCount: number;
+            afterCount: number;
+            pruned: number;
+            capped: number;
+            diskBudget: Record<string, unknown> | null;
+          }) => Promise<void> | void;
+        },
+      ) => {
+        const store: Record<string, SessionEntry> = {
+          keep: {
+            sessionId: "keep",
+            updatedAt: 1,
+            contextTokens: 128_000,
+            totalTokens: 20_000,
+            totalTokensFresh: true,
+          },
+        };
+        const result = await mutator(store);
+        await opts?.onMaintenanceApplied?.({
+          mode: "enforce",
+          beforeCount: 1,
+          afterCount: 1,
+          pruned: 0,
+          capped: 0,
+          diskBudget: null,
+        });
+        return result;
+      },
+    );
+    mocks.loadSessionStore.mockReturnValue({
+      keep: {
+        sessionId: "keep",
+        updatedAt: 1,
+      },
+    });
+
+    const { runtime, logs } = makeRuntime();
+    await sessionsCleanupCommand(
+      {
+        json: true,
+        enforce: true,
+        clearContextTokens: true,
+        clearTotalTokensFresh: true,
+      },
+      runtime,
+    );
+
+    expect(logs).toHaveLength(1);
+    const payload = JSON.parse(logs[0] ?? "{}") as Record<string, unknown>;
+    expect(payload.applied).toBe(true);
+    expect(payload.clearedContextTokens).toBe(1);
+    expect(payload.clearedTotalTokensFresh).toBe(1);
+  });
+
   it("renders a dry-run action table with keep/prune actions", async () => {
     mocks.enforceSessionDiskBudget.mockResolvedValue(null);
     mocks.loadSessionStore.mockReturnValue({

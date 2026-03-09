@@ -168,6 +168,16 @@ export function registerStatusHealthSessionsCommands(program: Command) {
       "Remove store entries whose transcript files are missing (bypasses age/count retention)",
       false,
     )
+    .option(
+      "--clear-context-tokens",
+      "Clear per-session contextTokens cache so window size re-resolves from current model/config",
+      false,
+    )
+    .option(
+      "--clear-total-tokens-fresh",
+      "Mark cached totalTokens snapshots as stale to avoid misleading utilization after context reset",
+      false,
+    )
     .option("--active-key <key>", "Protect this session key from budget-eviction")
     .option("--json", "Output JSON", false)
     .addHelpText(
@@ -185,6 +195,14 @@ export function registerStatusHealthSessionsCommands(program: Command) {
           [
             "openclaw sessions cleanup --enforce --store ./tmp/sessions.json",
             "Use a specific store.",
+          ],
+          [
+            "openclaw sessions cleanup --enforce --clear-context-tokens",
+            "Clear cached context window limits for all selected sessions.",
+          ],
+          [
+            "openclaw sessions cleanup --enforce --clear-context-tokens --clear-total-tokens-fresh",
+            "Also mark cached token snapshots stale until next real run.",
           ],
         ])}`,
     )
@@ -206,6 +224,8 @@ export function registerStatusHealthSessionsCommands(program: Command) {
             dryRun: Boolean(opts.dryRun),
             enforce: Boolean(opts.enforce),
             fixMissing: Boolean(opts.fixMissing),
+            clearContextTokens: Boolean(opts.clearContextTokens),
+            clearTotalTokensFresh: Boolean(opts.clearTotalTokensFresh),
             activeKey: opts.activeKey as string | undefined,
             json: Boolean(opts.json || parentOpts?.json),
           },

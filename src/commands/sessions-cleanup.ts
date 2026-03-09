@@ -40,6 +40,8 @@ export type SessionsCleanupOptions = {
   activeKey?: string;
   json?: boolean;
   fixMissing?: boolean;
+  clearContextTokens?: boolean;
+  clearTotalTokensFresh?: boolean;
 };
 
 type SessionCleanupAction =
@@ -63,6 +65,8 @@ type SessionCleanupSummary = {
   beforeCount: number;
   afterCount: number;
   missing: number;
+  clearedContextTokens: number;
+  clearedTotalTokensFresh: number;
   pruned: number;
   capped: number;
   diskBudget: Awaited<ReturnType<typeof enforceSessionDiskBudget>>;
@@ -155,12 +159,41 @@ function pruneMissingTranscriptEntries(params: {
   return removed;
 }
 
+function clearSessionTokenMetadata(params: {
+  store: Record<string, SessionEntry>;
+  clearContextTokens: boolean;
+  clearTotalTokensFresh: boolean;
+}): { clearedContextTokens: number; clearedTotalTokensFresh: number } {
+  let clearedContextTokens = 0;
+  let clearedTotalTokensFresh = 0;
+  for (const entry of Object.values(params.store)) {
+    if (!entry) {
+      continue;
+    }
+    if (params.clearContextTokens && entry.contextTokens !== undefined) {
+      delete entry.contextTokens;
+      clearedContextTokens += 1;
+    }
+    if (
+      params.clearTotalTokensFresh &&
+      typeof entry.totalTokens === "number" &&
+      entry.totalTokensFresh !== false
+    ) {
+      entry.totalTokensFresh = false;
+      clearedTotalTokensFresh += 1;
+    }
+  }
+  return { clearedContextTokens, clearedTotalTokensFresh };
+}
+
 async function previewStoreCleanup(params: {
   target: SessionStoreTarget;
   mode: "warn" | "enforce";
   dryRun: boolean;
   activeKey?: string;
   fixMissing?: boolean;
+  clearContextTokens?: boolean;
+  clearTotalTokensFresh?: boolean;
 }) {
   const maintenance = resolveMaintenanceConfig();
   const beforeStore = loadSessionStore(params.target.storePath, { skipCache: true });
@@ -178,6 +211,11 @@ async function previewStoreCleanup(params: {
           },
         })
       : 0;
+  const clearReport = clearSessionTokenMetadata({
+    store: previewStore,
+    clearContextTokens: Boolean(params.clearContextTokens),
+    clearTotalTokensFresh: Boolean(params.clearTotalTokensFresh),
+  });
   const pruned = pruneStaleEntries(previewStore, maintenance.pruneAfterMs, {
     log: false,
     onPruned: ({ key }) => {
@@ -209,6 +247,8 @@ async function previewStoreCleanup(params: {
   const afterPreviewCount = Object.keys(previewStore).length;
   const wouldMutate =
     missing > 0 ||
+    clearReport.clearedContextTokens > 0 ||
+    clearReport.clearedTotalTokensFresh > 0 ||
     pruned > 0 ||
     capped > 0 ||
     Boolean((diskBudget?.removedEntries ?? 0) > 0 || (diskBudget?.removedFiles ?? 0) > 0);
@@ -221,6 +261,8 @@ async function previewStoreCleanup(params: {
     beforeCount,
     afterCount: afterPreviewCount,
     missing,
+    clearedContextTokens: clearReport.clearedContextTokens,
+    clearedTotalTokensFresh: clearReport.clearedTotalTokensFresh,
     pruned,
     capped,
     diskBudget,
@@ -257,6 +299,10 @@ function renderStoreDryRunPlan(params: {
     `Entries: ${params.summary.beforeCount} -> ${params.summary.afterCount} (remove ${params.summary.beforeCount - params.summary.afterCount})`,
   );
   params.runtime.log(`Would prune missing transcripts: ${params.summary.missing}`);
+  params.runtime.log(`Would clear contextTokens: ${params.summary.clearedContextTokens}`);
+  params.runtime.log(
+    `Would mark totalTokensFresh stale: ${params.summary.clearedTotalTokensFresh}`,
+  );
   params.runtime.log(`Would prune stale: ${params.summary.pruned}`);
   params.runtime.log(`Would cap overflow: ${params.summary.capped}`);
   if (params.summary.diskBudget) {
@@ -318,6 +364,8 @@ export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runti
       dryRun: Boolean(opts.dryRun),
       activeKey: opts.activeKey,
       fixMissing: Boolean(opts.fixMissing),
+      clearContextTokens: Boolean(opts.clearContextTokens),
+      clearTotalTokensFresh: Boolean(opts.clearTotalTokensFresh),
     });
     previewResults.push(result);
   }
@@ -365,16 +413,21 @@ export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runti
     const appliedReportRef: { current: SessionMaintenanceApplyReport | null } = {
       current: null,
     };
-    const missingApplied = await updateSessionStore(
+    const applyReport = await updateSessionStore(
       target.storePath,
       async (store) => {
-        if (!opts.fixMissing) {
-          return 0;
-        }
-        return pruneMissingTranscriptEntries({
+        const missingApplied = opts.fixMissing
+          ? pruneMissingTranscriptEntries({
+              store,
+              storePath: target.storePath,
+            })
+          : 0;
+        const clearReport = clearSessionTokenMetadata({
           store,
-          storePath: target.storePath,
+          clearContextTokens: Boolean(opts.clearContextTokens),
+          clearTotalTokensFresh: Boolean(opts.clearTotalTokensFresh),
         });
+        return { missingApplied, ...clearReport };
       },
       {
         activeSessionKey: opts.activeKey,
@@ -389,6 +442,9 @@ export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runti
     const afterStore = loadSessionStore(target.storePath, { skipCache: true });
     const preview = previewResults.find((result) => result.summary.storePath === target.storePath);
     const appliedReport = appliedReportRef.current;
+    const missingApplied = applyReport?.missingApplied ?? 0;
+    const clearedContextTokens = applyReport?.clearedContextTokens ?? 0;
+    const clearedTotalTokensFresh = applyReport?.clearedTotalTokensFresh ?? 0;
     const summary: SessionCleanupSummary =
       appliedReport === null
         ? {
@@ -400,6 +456,8 @@ export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runti
               beforeCount: 0,
               afterCount: 0,
               missing: 0,
+              clearedContextTokens: 0,
+              clearedTotalTokensFresh: 0,
               pruned: 0,
               capped: 0,
               diskBudget: null,
@@ -417,11 +475,15 @@ export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runti
             beforeCount: appliedReport.beforeCount,
             afterCount: appliedReport.afterCount,
             missing: missingApplied,
+            clearedContextTokens,
+            clearedTotalTokensFresh,
             pruned: appliedReport.pruned,
             capped: appliedReport.capped,
             diskBudget: appliedReport.diskBudget,
             wouldMutate:
               missingApplied > 0 ||
+              clearedContextTokens > 0 ||
+              clearedTotalTokensFresh > 0 ||
               appliedReport.pruned > 0 ||
               appliedReport.capped > 0 ||
               Boolean(
@@ -464,5 +526,8 @@ export async function sessionsCleanupCommand(opts: SessionsCleanupOptions, runti
     }
     runtime.log(`Session store: ${summary.storePath}`);
     runtime.log(`Applied maintenance. Current entries: ${summary.appliedCount ?? 0}`);
+    runtime.log(
+      `Cleared contextTokens: ${summary.clearedContextTokens}, marked totalTokensFresh stale: ${summary.clearedTotalTokensFresh}`,
+    );
   }
 }
