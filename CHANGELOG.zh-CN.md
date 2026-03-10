@@ -13,6 +13,7 @@
 - WebChat：对非流式 assistant 空壳消息显示 `(no visible text)` 占位，便于排查。
 - WebChat：运行中触发 `chat.history` 刷新时，不再清空活跃流式草稿。
 - 文档流程：README 与 CHANGELOG 现为 fork 双语自维护文档；每次涉及用户可见行为的提交都要评估并同步中英文版本。
+- Cron 隔离会话：在 fresh run（`forceNew`/过期重建）时清空继承的 `sessionFile`，避免新 `sessionId` 仍指向旧 transcript 文件。
 
 ## 2026.3.8
 

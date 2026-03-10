@@ -166,6 +166,7 @@ describe("resolveCronSession", () => {
           sessionId: "existing-session-id-789",
           updatedAt: NOW_MS - 1000,
           systemSent: true,
+          sessionFile: "sessions/old-force-new-session.jsonl",
           lastChannel: "slack" as never,
           lastTo: "channel:C0XXXXXXXXX",
           lastAccountId: "acct-123",
@@ -190,6 +191,7 @@ describe("resolveCronSession", () => {
       expect(result.sessionEntry.lastAccountId).toBeUndefined();
       expect(result.sessionEntry.lastThreadId).toBeUndefined();
       expect(result.sessionEntry.deliveryContext).toBeUndefined();
+      expect(result.sessionEntry.sessionFile).toBeUndefined();
       // Per-session overrides must be preserved
       expect(result.sessionEntry.modelOverride).toBe("gpt-5.2");
     });
@@ -199,6 +201,7 @@ describe("resolveCronSession", () => {
         entry: {
           sessionId: "old-session-id",
           updatedAt: NOW_MS - 86_400_000,
+          sessionFile: "sessions/old-stale-session.jsonl",
           lastChannel: "slack" as never,
           lastTo: "channel:C0XXXXXXXXX",
           lastThreadId: "1737500000.999999",
@@ -217,6 +220,7 @@ describe("resolveCronSession", () => {
       expect(result.sessionEntry.lastAccountId).toBeUndefined();
       expect(result.sessionEntry.lastThreadId).toBeUndefined();
       expect(result.sessionEntry.deliveryContext).toBeUndefined();
+      expect(result.sessionEntry.sessionFile).toBeUndefined();
     });
 
     it("preserves delivery routing metadata when reusing fresh session", () => {

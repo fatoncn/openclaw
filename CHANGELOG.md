@@ -13,6 +13,7 @@ Docs: https://docs.openclaw.ai
 - WebChat: show `(no visible text)` placeholder for non-streaming assistant empty-shell messages to improve diagnosis.
 - WebChat: avoid clearing active stream draft during in-flight `chat.history` refresh.
 - Docs/process: README and CHANGELOG are now maintained as fork-focused bilingual docs; each commit should evaluate and sync both language files when user-facing behavior changes.
+- Cron isolated sessions: when starting a fresh run (`forceNew`/stale reset), clear inherited `sessionFile` to avoid pointing new `sessionId` at an old transcript file.
 
 ## 2026.3.8
 
