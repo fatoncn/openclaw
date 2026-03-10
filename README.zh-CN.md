@@ -70,6 +70,9 @@
   - 修复：补齐 `p2p -> direct` 归一化映射，确保 DM 豁免逻辑按预期生效
 - **`[上游]` provider 瞬态 INTERNAL 错误按可重试 timeout 分类**（`src/agents/pi-embedded-helpers/failover-matches.ts`）
   - `got status: INTERNAL` 和 `{"status":"INTERNAL","code":500}` 这类返回会归类为可重试的 timeout 风格 failover 错误。
+- **`[上游]` WebChat 在 `final` 无可见 assistant 内容时会吞掉流式文本**（`ui/src/ui/controllers/chat.ts` + `ui/src/ui/chat/grouped-render.ts`）
+  - 某些运行里 `delta` 已有可见文本，但 `final.message` 只有 thinking（无 text/tool/image）；刷新或历史回放时会出现不可见 assistant 空壳，且流式草稿被清掉。
+  - 修复：`final` 分支增加可见性校验，`final` 不可见时回退持久化 `chatStream`；对非流式 assistant 空壳显示 `(no visible text)` 占位；并在运行中触发 `loadChatHistory()` 时避免清空活跃流式草稿。
 
 ### 已被上游覆盖（不再是 fork 独有）
 

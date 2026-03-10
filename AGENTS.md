@@ -1,6 +1,7 @@
 # Repository Guidelines
 
 - Repo: https://github.com/openclaw/openclaw
+- This repository is the **Kosbling Edition** customized OpenClaw. `README.md`/`README.zh-CN.md` and `CHANGELOG.md`/`CHANGELOG.zh-CN.md` are intentionally rewritten fork documents (not upstream mirrors).
 - In chat replies, file references must be repo-root relative only (example: `extensions/bluebubbles/src/channel.ts:80`); never absolute paths or `~/...`.
 - GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed "\\n".
 - GitHub comment footgun: never use `gh issue/pr comment -b "..."` when body contains backticks or shell chars. Always use single-quoted heredoc (`-F - <<'EOF'`) so no command substitution/escaping corruption.
@@ -37,6 +38,7 @@
 - README (GitHub): keep absolute docs URLs (`https://docs.openclaw.ai/...`) so links work on GitHub.
 - Docs content must be generic: no personal device names/hostnames/paths; use placeholders like `user@gateway-host` and “gateway host”.
 - Root docs i18n (GitHub): root Chinese docs use `*.zh-CN.md` naming (not `*.cn.md`); keep `README.md`/`CHANGELOG.md` as default English sources and maintain top language switch links in both directions.
+- Commit gate for fork docs: for every commit, explicitly evaluate whether `README.md` + `README.zh-CN.md` and `CHANGELOG.md` + `CHANGELOG.zh-CN.md` need updates; if behavior/user-facing output changed, update both language versions in the same change.
 
 ## Docs i18n (zh-CN)
 

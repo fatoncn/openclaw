@@ -73,6 +73,9 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Fix: normalize `p2p -> direct` so the DM exception path works as expected
 - **`[Upstream]` provider transient INTERNAL errors are retryable failover timeouts** (`src/agents/pi-embedded-helpers/failover-matches.ts`)
   - `got status: INTERNAL` and payloads like `{"status":"INTERNAL","code":500}` are classified as transient timeout-style failover errors.
+- **`[Upstream]` WebChat streamed text could disappear when `final` had no displayable assistant content** (`ui/src/ui/controllers/chat.ts` + `ui/src/ui/chat/grouped-render.ts`)
+  - In some runs, `delta` had visible text but `final.message` only carried thinking blocks (no text/tool/image), so refresh/history replay showed an invisible assistant shell and the streamed draft was lost.
+  - Fix: on `final`, apply a visibility guard and fall back to persisted `chatStream` when the final assistant message is not displayable; render `(no visible text)` for non-streaming empty assistant shells; and avoid clearing active stream drafts during in-flight `loadChatHistory()` refreshes.
 
 ### Upstream-Covered (no longer fork-only)
 
