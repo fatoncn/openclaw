@@ -80,11 +80,13 @@ export async function loadChatHistory(state: ChatState) {
     const messages = Array.isArray(res.messages) ? res.messages : [];
     state.chatMessages = messages.filter((message) => !isAssistantSilentReply(message));
     state.chatThinkingLevel = res.thinkingLevel ?? null;
-    // Clear all streaming state — history includes tool results and text
-    // inline, so keeping streaming artifacts would cause duplicates.
-    maybeResetToolStream(state);
-    state.chatStream = null;
-    state.chatStreamStartedAt = null;
+    // Avoid wiping an active streaming draft during background history refreshes.
+    const hasActiveStreamingState = Boolean(state.chatRunId);
+    if (!hasActiveStreamingState) {
+      maybeResetToolStream(state);
+      state.chatStream = null;
+      state.chatStreamStartedAt = null;
+    }
   } catch (err) {
     state.lastError = String(err);
   } finally {
@@ -147,6 +149,85 @@ function normalizeFinalAssistantMessage(message: unknown): Record<string, unknow
     roleRequirement: "optional",
     allowTextField: true,
   });
+}
+
+function hasDisplayableImageContent(message: Record<string, unknown>): boolean {
+  const content = message.content;
+  if (!Array.isArray(content)) {
+    return false;
+  }
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    const item = block as Record<string, unknown>;
+    const type = typeof item.type === "string" ? item.type.toLowerCase() : "";
+    if (type === "image") {
+      const source = item.source;
+      if (
+        typeof item.url === "string" ||
+        (source &&
+          typeof source === "object" &&
+          typeof (source as Record<string, unknown>).data === "string")
+      ) {
+        return true;
+      }
+      continue;
+    }
+    if (type === "image_url") {
+      const imageUrl = item.image_url;
+      if (imageUrl && typeof imageUrl === "object") {
+        const entry = imageUrl as Record<string, unknown>;
+        if (typeof entry.url === "string") {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function hasDisplayableToolContent(message: Record<string, unknown>): boolean {
+  const role = typeof message.role === "string" ? message.role.toLowerCase() : "";
+  if (role === "toolresult" || role === "tool_result") {
+    return true;
+  }
+  if (typeof message.toolCallId === "string" || typeof message.tool_call_id === "string") {
+    return true;
+  }
+  const content = message.content;
+  if (!Array.isArray(content)) {
+    return false;
+  }
+  for (const block of content) {
+    if (!block || typeof block !== "object") {
+      continue;
+    }
+    const item = block as Record<string, unknown>;
+    const type = typeof item.type === "string" ? item.type.toLowerCase() : "";
+    if (
+      type === "toolcall" ||
+      type === "tool_call" ||
+      type === "tooluse" ||
+      type === "tool_use" ||
+      type === "toolresult" ||
+      type === "tool_result"
+    ) {
+      return true;
+    }
+    if (typeof item.name === "string" && (item.arguments != null || item.args != null)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isVisibleAssistantMessage(message: Record<string, unknown>): boolean {
+  const text = extractText(message);
+  if (typeof text === "string" && text.trim()) {
+    return true;
+  }
+  return hasDisplayableToolContent(message) || hasDisplayableImageContent(message);
 }
 
 export async function sendChatMessage(
@@ -272,7 +353,11 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   if (payload.runId && state.chatRunId && payload.runId !== state.chatRunId) {
     if (payload.state === "final") {
       const finalMessage = normalizeFinalAssistantMessage(payload.message);
-      if (finalMessage && !isAssistantSilentReply(finalMessage)) {
+      if (
+        finalMessage &&
+        !isAssistantSilentReply(finalMessage) &&
+        isVisibleAssistantMessage(finalMessage)
+      ) {
         state.chatMessages = [...state.chatMessages, finalMessage];
         return null;
       }
@@ -291,7 +376,11 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
     }
   } else if (payload.state === "final") {
     const finalMessage = normalizeFinalAssistantMessage(payload.message);
-    if (finalMessage && !isAssistantSilentReply(finalMessage)) {
+    if (
+      finalMessage &&
+      !isAssistantSilentReply(finalMessage) &&
+      isVisibleAssistantMessage(finalMessage)
+    ) {
       state.chatMessages = [...state.chatMessages, finalMessage];
     } else if (state.chatStream?.trim() && !isSilentReplyStream(state.chatStream)) {
       state.chatMessages = [

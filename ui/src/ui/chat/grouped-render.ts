@@ -262,7 +262,15 @@ function renderGroupedMessage(
     return html`${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}`;
   }
 
-  if (!markdown && !hasToolCards && !hasImages) {
+  const shouldShowNoVisibleTextPlaceholder =
+    role === "assistant" &&
+    !opts.isStreaming &&
+    !markdown &&
+    !hasToolCards &&
+    !hasImages &&
+    !reasoningMarkdown;
+
+  if (!markdown && !hasToolCards && !hasImages && !shouldShowNoVisibleTextPlaceholder) {
     return nothing;
   }
 
@@ -280,6 +288,13 @@ function renderGroupedMessage(
       ${
         markdown
           ? html`<div class="chat-text" dir="${detectTextDirection(markdown)}">${unsafeHTML(toSanitizedMarkdownHtml(markdown))}</div>`
+          : nothing
+      }
+      ${
+        shouldShowNoVisibleTextPlaceholder
+          ? html`
+              <div class="chat-text">(no visible text)</div>
+            `
           : nothing
       }
       ${toolCards.map((card) => renderToolCardSidebar(card, onOpenSidebar))}

@@ -222,6 +222,58 @@ describe("handleChatEvent", () => {
     expect(state.chatStream).toBe(null);
   });
 
+  it("falls back to streamed text when final payload has thinking only", () => {
+    const state = createState({
+      sessionKey: "main",
+      chatRunId: "run-1",
+      chatStream: "Streamed visible reply",
+      chatStreamStartedAt: 100,
+    });
+    const payload: ChatEventPayload = {
+      runId: "run-1",
+      sessionKey: "main",
+      state: "final",
+      message: {
+        role: "assistant",
+        content: [{ type: "thinking", thinking: "internal plan" }],
+        timestamp: 101,
+      },
+    };
+
+    expect(handleChatEvent(state, payload)).toBe("final");
+    expect(state.chatMessages).toMatchObject([
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "Streamed visible reply" }],
+      },
+    ]);
+    expect(state.chatStream).toBe(null);
+  });
+
+  it("keeps final payload when it contains displayable tool content without text", () => {
+    const state = createState({
+      sessionKey: "main",
+      chatRunId: "run-1",
+      chatStream: "Streamed visible reply",
+      chatStreamStartedAt: 100,
+    });
+    const finalMsg = {
+      role: "assistant",
+      content: [{ type: "tool_result", name: "browser", text: "" }],
+      timestamp: 101,
+    };
+    const payload: ChatEventPayload = {
+      runId: "run-1",
+      sessionKey: "main",
+      state: "final",
+      message: finalMsg,
+    };
+
+    expect(handleChatEvent(state, payload)).toBe("final");
+    expect(state.chatMessages).toEqual([finalMsg]);
+    expect(state.chatStream).toBe(null);
+  });
+
   it("appends final payload message from own run before clearing stream state", () => {
     const state = createState({
       sessionKey: "main",
@@ -534,6 +586,27 @@ describe("loadChatHistory", () => {
     // text takes precedence — "real reply" is NOT silent, so message is kept.
     expect(state.chatMessages).toHaveLength(1);
   });
+
+  it("does not clear active stream while run is still in flight", async () => {
+    const messages = [{ role: "assistant", content: [{ type: "text", text: "history reply" }] }];
+    const mockClient = {
+      request: vi.fn().mockResolvedValue({ messages }),
+    };
+    const state = createState({
+      client: mockClient as unknown as ChatState["client"],
+      connected: true,
+      chatRunId: "run-1",
+      chatStream: "Live stream draft",
+      chatStreamStartedAt: 123,
+    });
+
+    await loadChatHistory(state);
+
+    expect(state.chatMessages).toEqual(messages);
+    expect(state.chatRunId).toBe("run-1");
+    expect(state.chatStream).toBe("Live stream draft");
+    expect(state.chatStreamStartedAt).toBe(123);
+  });
 });
 
 describe("loadChatHistory", () => {
@@ -564,5 +637,23 @@ describe("loadChatHistory", () => {
     expect(state.chatThinkingLevel).toBe("low");
     expect(state.chatLoading).toBe(false);
     expect(state.lastError).toBeNull();
+  });
+
+  it("clears stale stream state when there is no active run", async () => {
+    const request = vi.fn().mockResolvedValue({
+      messages: [{ role: "assistant", content: [{ type: "text", text: "visible answer" }] }],
+    });
+    const state = createState({
+      connected: true,
+      client: { request } as unknown as ChatState["client"],
+      chatRunId: null,
+      chatStream: "stale draft",
+      chatStreamStartedAt: 456,
+    });
+
+    await loadChatHistory(state);
+
+    expect(state.chatStream).toBeNull();
+    expect(state.chatStreamStartedAt).toBeNull();
   });
 });
