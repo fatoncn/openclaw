@@ -252,6 +252,23 @@ describe("gateway sessions patch", () => {
     expect(entry.spawnDepth).toBe(2);
   });
 
+  test("sets spawnedBy for acp sessions", async () => {
+    const entry = expectPatchOk(
+      await runPatch({
+        storeKey: "agent:main:acp:task",
+        patch: { key: "agent:main:acp:task", spawnedBy: "agent:main:main" },
+      }),
+    );
+    expect(entry.spawnedBy).toBe("agent:main:main");
+  });
+
+  test("rejects spawnedBy on non-subagent and non-acp sessions", async () => {
+    const result = await runPatch({
+      patch: { key: MAIN_SESSION_KEY, spawnedBy: "agent:main:main" },
+    });
+    expectPatchError(result, "spawnedBy is only supported");
+  });
+
   test("rejects spawnDepth on non-subagent sessions", async () => {
     const result = await runPatch({
       patch: { key: MAIN_SESSION_KEY, spawnDepth: 1 },

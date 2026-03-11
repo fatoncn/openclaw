@@ -14,6 +14,7 @@ Docs: https://docs.openclaw.ai
 - WebChat: avoid clearing active stream draft during in-flight `chat.history` refresh.
 - Docs/process: README and CHANGELOG are now maintained as fork-focused bilingual docs; each commit should evaluate and sync both language files when user-facing behavior changes.
 - Cron isolated sessions: when starting a fresh run (`forceNew`/stale reset), clear inherited `sessionFile` to avoid pointing new `sessionId` at an old transcript file.
+- Gateway sessions.patch: allow `spawnedBy` lineage fields on `acp:*` session keys (in addition to `subagent:*`) to avoid ACP spawn patch failures.
 
 ## 2026.3.8
 
