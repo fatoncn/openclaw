@@ -71,6 +71,9 @@ All custom changes are marked in source code with `// KOSBLING-PATCH`.
   - Upstream DM normalization recognized `direct`/`dm` only and did not map Feishu `p2p`
   - Result: with `block_deliver.block_disable=true` and `dm_enable=true`, Feishu DMs were still filtered as non-DM targets
   - Fix: normalize `p2p -> direct` so the DM exception path works as expected
+- **`[Upstream]` ACP `sessions.patch` lineage validation rejected `acp:*` session keys** (`src/gateway/sessions-patch.ts`)
+  - `spawnedBy` updates were restricted to `subagent:*` keys only, while ACP spawn writes `spawnedBy` on `acp:*` keys.
+  - Fix: allow `spawnedBy` lineage fields on `subagent:*` or `acp:*` session keys (matches upstream PR #40995 / commit `425bd89`).
 - **`[Upstream]` provider transient INTERNAL errors are retryable failover timeouts** (`src/agents/pi-embedded-helpers/failover-matches.ts`)
   - `got status: INTERNAL` and payloads like `{"status":"INTERNAL","code":500}` are classified as transient timeout-style failover errors.
 - **`[Upstream]` WebChat streamed text could disappear when `final` had no displayable assistant content** (`ui/src/ui/controllers/chat.ts` + `ui/src/ui/chat/grouped-render.ts`)

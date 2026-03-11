@@ -68,6 +68,9 @@
   - 上游仅将 `direct`/`dm` 识别为私聊，未把飞书 `p2p` 映射到 `direct`
   - 导致 `block_deliver.block_disable=true` 且 `dm_enable=true` 时，飞书私聊仍被当成非 DM 进行切割
   - 修复：补齐 `p2p -> direct` 归一化映射，确保 DM 豁免逻辑按预期生效
+- **`[上游]` ACP `sessions.patch` 血缘字段校验会拒绝 `acp:*` 会话键**（`src/gateway/sessions-patch.ts`）
+  - `spawnedBy` 只允许写入 `subagent:*`，但 ACP spawn 会在 `acp:*` 会话键写入 `spawnedBy`。
+  - 修复：将 `spawnedBy` 校验放宽为允许 `subagent:*` 或 `acp:*`（与上游 PR #40995 / commit `425bd89` 一致）。
 - **`[上游]` provider 瞬态 INTERNAL 错误按可重试 timeout 分类**（`src/agents/pi-embedded-helpers/failover-matches.ts`）
   - `got status: INTERNAL` 和 `{"status":"INTERNAL","code":500}` 这类返回会归类为可重试的 timeout 风格 failover 错误。
 - **`[上游]` WebChat 在 `final` 无可见 assistant 内容时会吞掉流式文本**（`ui/src/ui/controllers/chat.ts` + `ui/src/ui/chat/grouped-render.ts`）
